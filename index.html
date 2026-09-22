@@ -2,7 +2,8 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1830">
 <title>Hierholzer paso a paso</title>
 <style>
   :root {
@@ -12,10 +13,13 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; }
   body {
+    height: 100vh; height: 100dvh;          /* dvh: en el celular descuenta la barra del navegador */
     background: radial-gradient(ellipse at 30% 20%, #1e2d55 0%, var(--fondo) 70%);
     color: var(--texto); font-family: "Segoe UI", Arial, sans-serif;
     display: flex; flex-direction: column; overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
   }
+  button { font-family: inherit; }
   header {
     display: flex; align-items: center; justify-content: space-between;
     padding: 14px 24px; border-bottom: 1px solid var(--borde); gap: 16px; flex-wrap: wrap;
@@ -25,11 +29,11 @@
   .tabs { display: flex; gap: 8px; }
   .tab {
     background: transparent; color: var(--suave); border: 1px solid var(--borde);
-    padding: 8px 16px; border-radius: 8px; font-size: 14px; cursor: pointer; font-family: inherit;
+    padding: 8px 16px; border-radius: 8px; font-size: 14px; cursor: pointer;
   }
   .tab.activa { background: var(--cian); color: #0b1430; border-color: var(--cian); font-weight: 700; }
   main { flex: 1; display: flex; min-height: 0; }
-  #lienzo-caja { flex: 1; position: relative; min-width: 0; }
+  #lienzo-caja { flex: 1; position: relative; min-width: 0; min-height: 0; touch-action: pan-y; }
   canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
   #leyenda-calle {
     position: absolute; left: 24px; bottom: 20px; right: 24px; pointer-events: none;
@@ -42,8 +46,9 @@
   }
   .fases { display: flex; flex-direction: column; gap: 4px; }
   .fase {
-    display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 8px;
+    display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 8px; width: 100%;
     color: var(--tenue); cursor: pointer; font-size: 14px; border: 1px solid transparent;
+    background: transparent; text-align: left;
   }
   .fase b {
     width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center;
@@ -68,29 +73,89 @@
   .controles { display: flex; gap: 8px; align-items: center; margin-top: auto; flex-wrap: wrap; }
   .controles button {
     background: var(--panel); color: var(--texto); border: 1px solid var(--borde); border-radius: 8px;
-    padding: 8px 12px; font-size: 14px; cursor: pointer; font-family: inherit;
+    padding: 8px 12px; font-size: 14px; cursor: pointer;
   }
   .controles button:hover { border-color: var(--cian); }
   .controles label { font-size: 12px; color: var(--suave); display: flex; align-items: center; gap: 6px; }
   .ayuda { font-size: 11.5px; color: var(--tenue); }
   sub { font-size: 70%; }
+  button:focus-visible { outline: 2px solid var(--cian); outline-offset: 2px; }
+
+  /* ---------------------------------------------------------------- celular (vertical) */
+  @media (max-width: 760px) {
+    header { padding: 10px 14px; gap: 8px; }
+    header h1 { font-size: 16px; }
+    .tabs { width: 100%; }
+    .tab { flex: 1; min-height: 40px; padding: 8px 6px; font-size: 13.5px; }
+    main { flex-direction: column; }
+    #lienzo-caja { flex: none; height: 48vh; height: 48dvh; min-height: 240px; }
+    #leyenda-calle { left: 14px; right: 14px; bottom: 10px; font-size: 16px; }
+    #leyenda-calle small { font-size: 12px; }
+    aside {
+      width: 100%; flex: 1; min-height: 0; border-left: 0; border-top: 1px solid var(--borde);
+      padding: 12px 14px 0; gap: 10px;
+    }
+    .fases { flex-direction: row; gap: 6px; }
+    .fase { flex: 1; justify-content: center; padding: 4px 0; }
+    .fase span { display: none; }                   /* el nombre de la fase ya está en el título */
+    .fase b { width: 32px; height: 32px; font-size: 14px; }
+    #titulo-fase { font-size: 18px; }
+    #texto-fase { font-size: 14.5px; }
+    .dato { padding: 8px 10px; }
+    .dato .v { font-size: 20px; }
+    .ayuda { order: 1; }
+    .controles {
+      order: 2; position: sticky; bottom: 0; margin: auto -14px 0; gap: 8px;
+      padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
+      background: #16223f; border-top: 1px solid var(--borde);
+    }
+    .controles button { flex: 1; min-height: 44px; font-size: 15px; }
+    .controles label { width: 100%; }
+    .controles input { flex: 1; }
+  }
+
+  /* ---------------------------------------------------------------- celular acostado */
+  @media (max-height: 520px) and (orientation: landscape) {
+    header { padding: 6px 14px; }
+    header h1 { font-size: 15px; }
+    .tab { padding: 6px 12px; font-size: 13px; }
+    #leyenda-calle { left: 14px; bottom: 8px; font-size: 15px; }
+    #leyenda-calle small { font-size: 11px; }
+    aside { width: 300px; padding: 10px 12px; gap: 8px; }
+    .fases { flex-direction: row; gap: 4px; }
+    .fase { flex: 1; justify-content: center; padding: 3px 0; }
+    .fase span { display: none; }
+    #titulo-fase { font-size: 16px; }
+    #texto-fase { font-size: 13px; line-height: 1.4; }
+    .dato { padding: 6px 8px; }
+    .dato .v { font-size: 17px; }
+    .ayuda { display: none; }
+    aside { padding-bottom: 0; }
+    .controles {
+      position: sticky; bottom: 0; margin: auto -12px 0; padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+      background: #16223f; border-top: 1px solid var(--borde);
+    }
+    .controles button { flex: 1; min-height: 38px; }
+    .controles label { width: 100%; }
+    .controles input { flex: 1; }
+  }
 </style>
 </head>
 <body>
 <header>
   <h1>Recorridos de Euler · <span>algoritmo de Hierholzer</span></h1>
-  <div class="tabs">
+  <div class="tabs" role="group" aria-label="Caso">
     <button class="tab" data-caso="ejemplo">Ejemplo del informe</button>
     <button class="tab" data-caso="barrio">Barrio de la UAI</button>
   </div>
 </header>
 <main>
   <div id="lienzo-caja">
-    <canvas id="lienzo"></canvas>
-    <div id="leyenda-calle"></div>
+    <canvas id="lienzo" role="img" aria-label="Dibujo del dígrafo y del recorrido"></canvas>
+    <div id="leyenda-calle" aria-live="polite"></div>
   </div>
   <aside>
-    <div class="fases" id="fases"></div>
+    <nav class="fases" id="fases" aria-label="Fases"></nav>
     <div id="titulo-fase"></div>
     <div id="texto-fase"></div>
     <div class="datos" id="datos"></div>
@@ -101,7 +166,7 @@
       <button id="btn-sig">Fase ▶</button>
       <label>Velocidad <input id="vel" type="range" min="0.25" max="4" step="0.25" value="1"></label>
     </div>
-    <div class="ayuda">Flechas o control de diapositivas: cambiar de fase · Espacio: pausa · R: repetir · 1 y 2: cambiar de caso</div>
+    <div class="ayuda" id="ayuda"></div>
   </aside>
 </main>
 <script>
@@ -109,20 +174,27 @@ const DATOS = {"ejemplo": {"nombre": "Ejemplo del informe", "unidad": "aristas",
 
 const FASES = ["El dígrafo", "Balance de cada vértice", "Pasadas extra", "Hierholzer: armar el circuito", "Recorrido completo"];
 const COLORES_PASO = ["#00d9ff", "#e07b39", "#d65bff", "#f2c14e", "#5fe39a", "#ff6b8b"];
+const TACTIL = matchMedia("(hover: none), (pointer: coarse)");   // pantalla táctil: cambia el texto de ayuda
 
-const lienzo = document.getElementById("lienzo");
+const $ = id => document.getElementById(id);
+const lienzo = $("lienzo"), caja = $("lienzo-caja");
 const ctx = lienzo.getContext("2d");
 let caso, D, fase = 0, t = 0, pausa = false, ultimo = performance.now();
-let esc, ox, oy, radio, grosor, esDoble;
+let esc, ox, oy, radio, grosor, ui = 1, esDoble;
 
 const fmtKm = m => (m / 1000 + 1e-9).toFixed(2).replace(".", ",") + " km";  // el 1e-9 evita que 6,325 se redondee para abajo
 const suma = ids => ids.reduce((s, i) => s + D.arcos[i].largo, 0);
 const clave = (u, v) => u + ">" + v;
+// los nombres de calles vienen de OpenStreetMap: se escapan antes de meterlos en el HTML
+const html = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
 // ------------------------------------------------------------------ preparación de un caso
 function cargar(nombre) {
   caso = nombre; D = DATOS[nombre];
-  document.querySelectorAll(".tab").forEach(b => b.classList.toggle("activa", b.dataset.caso === nombre));
+  document.querySelectorAll(".tab").forEach(b => {
+    b.classList.toggle("activa", b.dataset.caso === nombre);
+    b.setAttribute("aria-pressed", b.dataset.caso === nombre);
+  });
   const pares = new Set(Object.values(D.arcos).map(a => clave(a.u, a.v)));
   esDoble = a => pares.has(clave(a.v, a.u));
   D.velocidad = nombre === "ejemplo" ? 0.9 : 6;          // arcos por segundo
@@ -138,20 +210,25 @@ function cargar(nombre) {
 }
 
 function ajustar() {
-  const r = lienzo.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
-  lienzo.width = r.width * dpr; lienzo.height = r.height * dpr;
+  if (!D) return;
+  const r = caja.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  if (r.width < 10 || r.height < 10) return;             // todavía sin tamaño (pestaña oculta, etc.)
+  lienzo.width = Math.round(r.width * dpr); lienzo.height = Math.round(r.height * dpr);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  // en pantallas chicas se achican los círculos, las letras y las flechas del ejemplo
+  ui = Math.max(0.55, Math.min(1, Math.min(r.width, r.height) / 520));
   const pts = [...D.zonaV].map(v => D.vertices[v]);
   const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
   const margen = caso === "ejemplo" ? 0.6 : 60;
   const minx = Math.min(...xs) - margen, maxx = Math.max(...xs) + margen;
   const miny = Math.min(...ys) - margen, maxy = Math.max(...ys) + margen;
-  const w = r.width, h = r.height - 70;
+  const reserva = r.height < 420 ? 46 : 70;               // lugar abajo para el nombre de la calle
+  const w = r.width, h = Math.max(50, r.height - reserva);
   esc = Math.min(w / (maxx - minx), h / (maxy - miny));
   ox = (w - esc * (maxx - minx)) / 2 - esc * minx;
   oy = 10 + (h - esc * (maxy - miny)) / 2 + esc * maxy;
-  radio = caso === "ejemplo" ? 24 : 4.5;
-  grosor = caso === "ejemplo" ? 6 : 3;
+  radio = caso === "ejemplo" ? 24 * ui : 4.5;
+  grosor = caso === "ejemplo" ? Math.max(3.5, 6 * ui) : 3;
 }
 const P = v => [ox + esc * D.vertices[v].x, oy - esc * D.vertices[v].y];
 
@@ -180,7 +257,7 @@ function linea(i, color, ancho, opts = {}) {
 
 function flecha(x1, y1, x2, y2, color, en) {
   const x = x1 + (x2 - x1) * en, y = y1 + (y2 - y1) * en, ang = Math.atan2(y2 - y1, x2 - x1);
-  const s = caso === "ejemplo" ? 16 : 7;
+  const s = caso === "ejemplo" ? 16 * ui : 7;
   ctx.save(); ctx.fillStyle = color; ctx.translate(x, y); ctx.rotate(ang);
   ctx.beginPath(); ctx.moveTo(s, 0); ctx.lineTo(-s * 0.7, s * 0.65); ctx.lineTo(-s * 0.7, -s * 0.65); ctx.closePath(); ctx.fill();
   ctx.restore();
@@ -190,10 +267,10 @@ function vertice(v, color, r, texto, colorTexto = "#fff") {
   const [x, y] = P(v);
   ctx.save();
   ctx.fillStyle = caso === "ejemplo" ? "#0e1733" : color; ctx.strokeStyle = color;
-  ctx.lineWidth = caso === "ejemplo" ? 5 : 0;
+  ctx.lineWidth = caso === "ejemplo" ? Math.max(3, 5 * ui) : 0;
   ctx.beginPath(); ctx.arc(x, y, r, 0, 2 * Math.PI); ctx.fill(); if (ctx.lineWidth) ctx.stroke();
   if (texto) {
-    ctx.fillStyle = colorTexto; ctx.font = `700 ${caso === "ejemplo" ? 20 : 13}px Segoe UI, Arial`;
+    ctx.fillStyle = colorTexto; ctx.font = `700 ${caso === "ejemplo" ? Math.round(20 * ui) : 13}px Segoe UI, Arial`;
     ctx.textAlign = caso === "ejemplo" ? "center" : "left"; ctx.textBaseline = "middle";
     if (caso === "ejemplo") ctx.fillText(texto, x, y + 1); else ctx.fillText(texto, x + r + 3, y - r - 3);
   }
@@ -203,7 +280,7 @@ function vertice(v, color, r, texto, colorTexto = "#fff") {
 function anillo(v, color, avance) {
   const [x, y] = P(v);
   ctx.save(); ctx.strokeStyle = color; ctx.globalAlpha = 1 - avance; ctx.lineWidth = 3;
-  ctx.beginPath(); ctx.arc(x, y, radio + 6 + avance * (caso === "ejemplo" ? 30 : 26), 0, 2 * Math.PI); ctx.stroke();
+  ctx.beginPath(); ctx.arc(x, y, radio + 6 + avance * (caso === "ejemplo" ? 30 * ui : 26), 0, 2 * Math.PI); ctx.stroke();
   ctx.restore();
 }
 
@@ -247,7 +324,7 @@ function marcaInicio() {
 
 function camion(x, y, ang) {
   ctx.save(); ctx.translate(x, y); ctx.rotate(ang);
-  const s = caso === "ejemplo" ? 1.6 : 1.4;
+  const s = caso === "ejemplo" ? 1.6 * ui : 1.4;
   ctx.shadowColor = "#e07b39"; ctx.shadowBlur = 16;
   ctx.fillStyle = "#e07b39"; ctx.fillRect(-12 * s, -7 * s, 16 * s, 14 * s);   // caja
   ctx.fillStyle = "#ffffff"; ctx.fillRect(4 * s, -6 * s, 8 * s, 12 * s);      // cabina
@@ -255,17 +332,22 @@ function camion(x, y, ang) {
   ctx.restore();
 }
 
+function leyenda(arriba, texto) {
+  $("leyenda-calle").innerHTML = texto ? `<small>${html(arriba)}</small>${html(texto)}` : "";
+}
+
 // ------------------------------------------------------------------ panel lateral
 function panel() {
-  document.getElementById("fases").innerHTML = FASES.map((f, k) =>
-    `<div class="fase ${k === fase ? "actual" : k < fase ? "hecha" : ""}" data-k="${k}"><b>${k + 1}</b>${f}</div>`).join("");
+  $("fases").innerHTML = FASES.map((f, k) =>
+    `<button class="fase ${k === fase ? "actual" : k < fase ? "hecha" : ""}" data-k="${k}" aria-label="Fase ${k + 1}: ${f}"` +
+    `${k === fase ? ' aria-current="step"' : ""}><b>${k + 1}</b><span>${f}</span></button>`).join("");
   document.querySelectorAll(".fase").forEach(el => el.onclick = () => irA(+el.dataset.k));
-  document.getElementById("titulo-fase").textContent = FASES[fase];
+  $("titulo-fase").textContent = FASES[fase];
   const nV = D.zonaV.size, nA = D.requeridos.length, u = D.unidad;
   const desb = [...D.zonaV].filter(v => D.vertices[v].bal !== 0).length;
-  const txt = document.getElementById("texto-fase"), datos = document.getElementById("datos");
+  const txt = $("texto-fase"), datos = $("datos");
   const dato = (v, e, cl = "") => `<div class="dato ${cl}"><div class="v">${v}</div><div class="e">${e}</div></div>`;
-  document.getElementById("lista-pasos").innerHTML = "";
+  $("lista-pasos").innerHTML = "";
   if (fase === 0) {
     txt.innerHTML = caso === "ejemplo"
       ? "Dos triángulos que comparten el vértice C. Cada arco tiene un sentido: es un dígrafo."
@@ -286,10 +368,10 @@ function panel() {
   } else if (fase === 3) {
     txt.innerHTML = "Se arma un circuito desde el inicio. Mientras queden arcos sin usar, se busca un vértice del circuito que tenga arcos libres, se arma otro circuito desde ahí y se empalma.";
     datos.innerHTML = dato(D.pasos.length - 1, "subcircuitos empalmados", "cian") + dato(D.totalPasos, u + " en total");
-    document.getElementById("lista-pasos").innerHTML = D.pasos.map((p, k) =>
+    $("lista-pasos").innerHTML = D.pasos.map((p, k) =>
       `<div style="border-color:${COLORES_PASO[k % COLORES_PASO.length]}">` +
       (k === 0 ? `Circuito inicial: ${p.arcos.length} ${u}` :
-                 `Subcircuito ${k}: ${p.arcos.length} ${u} · empalme en ${D.vertices[p.en].nombre}`) + `</div>`).join("");
+                 `Subcircuito ${k}: ${p.arcos.length} ${u} · empalme en ${html(D.vertices[p.en].nombre)}`) + `</div>`).join("");
   } else {
     txt.innerHTML = "El recorrido final: pasa por todos los arcos y vuelve al punto de partida." +
       (caso === "barrio" ? " En naranja punteado, las pasadas en las que el camión solo circula." : "");
@@ -304,15 +386,18 @@ function panel() {
 // ------------------------------------------------------------------ fases
 function irA(k) {
   fase = Math.max(0, Math.min(FASES.length - 1, k)); t = 0; pausa = false;
-  document.getElementById("btn-pausa").textContent = "Pausa";
-  document.getElementById("leyenda-calle").innerHTML = "";
+  $("btn-pausa").textContent = "Pausa";
+  leyenda();
   panel();
 }
 
+function alternarPausa() {
+  pausa = !pausa; $("btn-pausa").textContent = pausa ? "Seguir" : "Pausa";
+}
+
 function cuadro(dt) {
-  if (!pausa) t += dt * +document.getElementById("vel").value;
+  if (!pausa) t += dt * +$("vel").value;
   fondo();
-  const leyenda = document.getElementById("leyenda-calle");
   if (fase === 0) {
     const n = Math.min(D.requeridos.length, Math.floor(t * D.velocidad * 3) + 1);
     D.requeridos.slice(0, n).forEach(i => linea(i, "#7fcadd", grosor, { flecha: true }));
@@ -342,13 +427,13 @@ function cuadro(dt) {
       });
       if (k > 0) {
         const [x, y] = P(p.en);
-        ctx.save(); ctx.fillStyle = col; ctx.font = "700 14px Segoe UI, Arial";
-        ctx.fillText("empalme", x + 12, y + (caso === "ejemplo" ? 44 : 22)); ctx.restore();
+        ctx.save(); ctx.fillStyle = col; ctx.font = `700 ${caso === "ejemplo" ? Math.round(14 * Math.max(ui, 0.8)) : 14}px Segoe UI, Arial`;
+        ctx.fillText("empalme", x + 12, y + (caso === "ejemplo" ? 44 * ui : 22)); ctx.restore();
       }
     });
     vertices("normal"); marcaInicio();
     document.querySelectorAll("#lista-pasos div").forEach((el, k) => el.classList.toggle("actual", k === actual));
-    leyenda.innerHTML = `<small>${actual === 0 ? "Circuito inicial desde" : "Empalme en"}</small>${D.vertices[D.pasos[actual].en].nombre}`;
+    leyenda(actual === 0 ? "Circuito inicial desde" : "Empalme en", D.vertices[D.pasos[actual].en].nombre);
   } else {
     base("#2c416c", 1);
     const pos = Math.min(D.ruta.length, t * D.velocidad * 0.9);
@@ -364,14 +449,13 @@ function cuadro(dt) {
     const a0 = Math.floor(pos), a1 = Math.ceil(pos), r = pos - a0;
     const m = D.acum[a0] + r * (D.acum[a1] - D.acum[a0]);
     const j = D.acumJ[a0] + r * (D.acumJ[a1] - D.acumJ[a0]);
-    const el = id => document.getElementById(id);
-    el("d-n").textContent = Math.floor(pos);
-    if (caso === "barrio") { el("d-j").textContent = fmtKm(j); el("d-x").textContent = fmtKm(m - j); el("d-t").textContent = fmtKm(m); }
+    $("d-n").textContent = Math.floor(pos);
+    if (caso === "barrio") { $("d-j").textContent = fmtKm(j); $("d-x").textContent = fmtKm(m - j); $("d-t").textContent = fmtKm(m); }
     if (pos >= D.ruta.length) {
-      leyenda.innerHTML = `<small>Terminado</small>Volvió al inicio pasando por todos los arcos`;
+      leyenda("Terminado", "Volvió al inicio pasando por todos los arcos");
     } else {
       const a = D.arcos[D.ruta[k]];
-      leyenda.innerHTML = `<small>${D.recolecta[k] ? (caso === "barrio" ? "Recolectando en" : "Recorriendo") : "Solo circula por"}</small>${a.calle}`;
+      leyenda(D.recolecta[k] ? (caso === "barrio" ? "Recolectando en" : "Recorriendo") : "Solo circula por", a.calle);
     }
   }
 }
@@ -384,20 +468,36 @@ function bucle(ahora) {
 
 // ------------------------------------------------------------------ controles
 document.querySelectorAll(".tab").forEach(b => b.onclick = () => cargar(b.dataset.caso));
-document.getElementById("btn-sig").onclick = () => irA(fase + 1);
-document.getElementById("btn-ant").onclick = () => irA(fase - 1);
-document.getElementById("btn-pausa").onclick = () => {
-  pausa = !pausa; document.getElementById("btn-pausa").textContent = pausa ? "Seguir" : "Pausa";
-};
+$("btn-sig").onclick = () => irA(fase + 1);
+$("btn-ant").onclick = () => irA(fase - 1);
+$("btn-pausa").onclick = alternarPausa;
 document.addEventListener("keydown", e => {
+  if (e.target.matches("input")) return;                  // no pisar las flechas del control de velocidad
   if (["ArrowRight", "PageDown", "ArrowDown", "Enter"].includes(e.key)) { irA(fase + 1); e.preventDefault(); }
   else if (["ArrowLeft", "PageUp", "ArrowUp", "Backspace"].includes(e.key)) { irA(fase - 1); e.preventDefault(); }
-  else if (e.key === " ") { document.getElementById("btn-pausa").click(); e.preventDefault(); }
+  else if (e.key === " ") { alternarPausa(); e.preventDefault(); }
   else if (e.key === "r" || e.key === "R") irA(fase);
   else if (e.key === "1") cargar("ejemplo");
   else if (e.key === "2") cargar("barrio");
 });
-window.addEventListener("resize", ajustar);
+
+// en el celular: deslizar el mapa a los costados cambia de fase y tocarlo pausa
+let toque = null;
+caja.addEventListener("pointerdown", e => { toque = { x: e.clientX, y: e.clientY, t: performance.now(), tipo: e.pointerType }; });
+caja.addEventListener("pointerup", e => {
+  if (!toque) return;
+  const dx = e.clientX - toque.x, dy = e.clientY - toque.y, dur = performance.now() - toque.t;
+  if (Math.abs(dx) > 50 && Math.abs(dx) > 1.5 * Math.abs(dy)) irA(fase + (dx < 0 ? 1 : -1));
+  else if (toque.tipo !== "mouse" && Math.hypot(dx, dy) < 10 && dur < 350) alternarPausa();
+  toque = null;
+});
+caja.addEventListener("pointercancel", () => { toque = null; });
+
+const ayuda = () => $("ayuda").textContent = TACTIL.matches
+  ? "Deslizá el mapa a los costados para cambiar de fase · Tocalo para pausar"
+  : "Flechas o control de diapositivas: cambiar de fase · Espacio: pausa · R: repetir · 1 y 2: cambiar de caso";
+ayuda(); TACTIL.addEventListener("change", ayuda);
+new ResizeObserver(ajustar).observe(caja);                // también cuando gira el celular o cambia la barra del navegador
 
 cargar("ejemplo");
 requestAnimationFrame(bucle);
