@@ -33,8 +33,17 @@
   }
   .tab.activa { background: var(--cian); color: #0b1430; border-color: var(--cian); font-weight: 700; }
   main { flex: 1; display: flex; min-height: 0; }
-  #lienzo-caja { flex: 1; position: relative; min-width: 0; min-height: 0; touch-action: pan-y; }
-  canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #lienzo-caja { flex: 1; position: relative; min-width: 0; min-height: 0; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }   /* el zoom con dos dedos lo maneja la página */
+  canvas.con-zoom { cursor: grab; }
+  canvas.con-zoom:active { cursor: grabbing; }
+  .zoom { position: absolute; top: 12px; right: 12px; display: flex; flex-direction: column; gap: 6px; }
+  .zoom button {
+    width: 36px; height: 36px; border-radius: 8px; border: 1px solid var(--borde); cursor: pointer;
+    background: rgba(27,40,72,.85); color: var(--texto); font-size: 20px; line-height: 1;
+  }
+  .zoom button:hover { border-color: var(--cian); }
+  .zoom button:disabled { opacity: .35; cursor: default; border-color: var(--borde); }
   #leyenda-calle {
     position: absolute; left: 24px; bottom: 20px; right: 24px; pointer-events: none;
     font-size: 22px; font-weight: 700; text-shadow: 0 2px 8px rgba(0,0,0,.8);
@@ -153,6 +162,11 @@
   <div id="lienzo-caja">
     <canvas id="lienzo" role="img" aria-label="Dibujo del dígrafo y del recorrido"></canvas>
     <div id="leyenda-calle" aria-live="polite"></div>
+    <div class="zoom">
+      <button id="z-mas" aria-label="Acercar">+</button>
+      <button id="z-menos" aria-label="Alejar">−</button>
+      <button id="z-todo" aria-label="Ver todo">⟲</button>
+    </div>
   </div>
   <aside>
     <nav class="fases" id="fases" aria-label="Fases"></nav>
@@ -181,6 +195,8 @@ const lienzo = $("lienzo"), caja = $("lienzo-caja");
 const ctx = lienzo.getContext("2d");
 let caso, D, fase = 0, t = 0, pausa = false, ultimo = performance.now();
 let esc, ox, oy, radio, grosor, ui = 1, esDoble;
+let cw = 0, ch = 0;                 // tamaño del mapa en píxeles de pantalla
+let vz = 1, vx = 0, vy = 0;         // zoom: escala y desplazamiento de la vista
 
 const fmtKm = m => (m / 1000 + 1e-9).toFixed(2).replace(".", ",") + " km";  // el 1e-9 evita que 6,325 se redondee para abajo
 const suma = ids => ids.reduce((s, i) => s + D.arcos[i].largo, 0);
@@ -206,7 +222,7 @@ function cargar(nombre) {
   let n = 0;
   D.inicioPaso = D.pasos.map(p => { const s = n; n += p.arcos.length; return s; });
   D.totalPasos = n;
-  ajustar(); irA(0);
+  ajustar(); verTodo(); irA(0);
 }
 
 function ajustar() {
@@ -215,6 +231,8 @@ function ajustar() {
   if (r.width < 10 || r.height < 10) return;             // todavía sin tamaño (pestaña oculta, etc.)
   lienzo.width = Math.round(r.width * dpr); lienzo.height = Math.round(r.height * dpr);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  cw = r.width; ch = r.height;
+  limitarVista();
   // en pantallas chicas se achican los círculos, las letras y las flechas del ejemplo
   ui = Math.max(0.55, Math.min(1, Math.min(r.width, r.height) / 520));
   const pts = [...D.zonaV].map(v => D.vertices[v]);
@@ -230,7 +248,24 @@ function ajustar() {
   radio = caso === "ejemplo" ? 24 * ui : 4.5;
   grosor = caso === "ejemplo" ? Math.max(3.5, 6 * ui) : 3;
 }
-const P = v => [ox + esc * D.vertices[v].x, oy - esc * D.vertices[v].y];
+// posición en pantalla de un vértice; con zoom se agranda el mapa pero no el grosor de las líneas ni las letras
+const P = v => [vx + vz * (ox + esc * D.vertices[v].x), vy + vz * (oy - esc * D.vertices[v].y)];
+
+// ------------------------------------------------------------------ zoom
+const ZOOM_MAX = 8;
+function limitarVista() {                                 // que el mapa nunca se vaya de la pantalla
+  vx = Math.min(0, Math.max(cw * (1 - vz), vx));
+  vy = Math.min(0, Math.max(ch * (1 - vz), vy));
+  lienzo.classList.toggle("con-zoom", vz > 1.01);
+  $("z-menos").disabled = $("z-todo").disabled = vz <= 1.01;
+  $("z-mas").disabled = vz >= ZOOM_MAX - 0.01;
+}
+function zoomEn(factor, cx = cw / 2, cy = ch / 2) {      // acerca o aleja dejando fijo el punto (cx, cy)
+  const nz = Math.max(1, Math.min(ZOOM_MAX, vz * factor)), k = nz / vz;
+  vx = cx - k * (cx - vx); vy = cy - k * (cy - vy); vz = nz;
+  limitarVista();
+}
+function verTodo() { vz = 1; vx = 0; vy = 0; limitarVista(); }
 
 // ------------------------------------------------------------------ dibujo
 function puntos(i, corr) {
@@ -295,18 +330,53 @@ function base(colorArco, alfa) {
   ctx.globalAlpha = 1;
 }
 
+// Pone los números de balance al lado de cada esquina sin que se pisen: prueba 8 posiciones alrededor
+// del punto y se queda con la que menos choca con otras esquinas, con la marca de la UAI y con los números ya puestos.
+const solape = (a, b) => Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) *
+                         Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+const DIRECCIONES = [[1, -1], [1, 1], [-1, -1], [-1, 1], [1, 0], [-1, 0], [0, -1], [0, 1]];
+function etiquetas(items) {
+  const ocupado = [...D.zonaV].map(v => {
+    const [x, y] = P(v), r = D.vertices[v].bal ? 8 : radio;
+    return { x: x - r, y: y - r, w: 2 * r, h: 2 * r };
+  });
+  if (caso === "barrio") { const [x, y] = P(D.inicio); ocupado.push({ x: x - 12, y: y - 12, w: 56, h: 40 }); }
+  ctx.save(); ctx.font = "700 13px Segoe UI, Arial"; ctx.textBaseline = "middle";
+  for (const it of items) {
+    const w = ctx.measureText(it.texto).width + 8, h = 17, d = it.r + 3;
+    let mejor = null, costo = Infinity;
+    for (const [dx, dy] of DIRECCIONES) {
+      const c = { x: dx > 0 ? it.x + d : dx < 0 ? it.x - d - w : it.x - w / 2,
+                  y: dy > 0 ? it.y + d : dy < 0 ? it.y - d - h : it.y - h / 2, w, h };
+      let k = ocupado.reduce((s, o) => s + solape(c, o), 0);
+      if (c.x < 0 || c.y < 0 || c.x + w > cw || c.y + h > ch) k += 1e4;   // que no se salga del mapa
+      if (k < costo) { costo = k; mejor = c; }
+      if (k === 0) break;
+    }
+    ocupado.push(mejor);
+    ctx.fillStyle = "rgba(15,24,48,.85)"; ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(mejor.x, mejor.y, w, h, 5); else ctx.rect(mejor.x, mejor.y, w, h);
+    ctx.fill();
+    ctx.fillStyle = it.color; ctx.fillText(it.texto, mejor.x + 4, mejor.y + h / 2 + 0.5);
+  }
+  ctx.restore();
+}
+
 function vertices(modo) {
+  const numeros = [];
   for (const v of D.zonaV) {
     const b = D.vertices[v].bal;
     if (modo === "balance" && b !== 0) {
-      const c = b > 0 ? "#e07b39" : "#f2c14e";
-      vertice(v, c, caso === "ejemplo" ? radio : 8, (b > 0 ? "+" : "−") + Math.abs(b), c);
+      const c = b > 0 ? "#e07b39" : "#f2c14e", texto = (b > 0 ? "+" : "−") + Math.abs(b);
+      if (caso === "ejemplo") vertice(v, c, radio, texto, c);
+      else { vertice(v, c, 8); const [x, y] = P(v); numeros.push({ x, y, r: 8, texto, color: c }); }
     } else if (caso === "ejemplo") {
       vertice(v, modo === "balance" ? "#5fe39a" : "#00d9ff", radio, D.vertices[v].nombre);
     } else {
       vertice(v, "#00d9ff", radio);
     }
   }
+  if (numeros.length) etiquetas(numeros);
 }
 
 function marcaInicio() {
@@ -479,23 +549,65 @@ document.addEventListener("keydown", e => {
   else if (e.key === "r" || e.key === "R") irA(fase);
   else if (e.key === "1") cargar("ejemplo");
   else if (e.key === "2") cargar("barrio");
+  else if (e.key === "+" || e.key === "=") zoomEn(1.6);
+  else if (e.key === "-") zoomEn(1 / 1.6);
+  else if (e.key === "0") verTodo();
 });
 
-// en el celular: deslizar el mapa a los costados cambia de fase y tocarlo pausa
-let toque = null;
-caja.addEventListener("pointerdown", e => { toque = { x: e.clientX, y: e.clientY, t: performance.now(), tipo: e.pointerType }; });
-caja.addEventListener("pointerup", e => {
-  if (!toque) return;
-  const dx = e.clientX - toque.x, dy = e.clientY - toque.y, dur = performance.now() - toque.t;
-  if (Math.abs(dx) > 50 && Math.abs(dx) > 1.5 * Math.abs(dy)) irA(fase + (dx < 0 ? 1 : -1));
-  else if (toque.tipo !== "mouse" && Math.hypot(dx, dy) < 10 && dur < 350) alternarPausa();
-  toque = null;
+// ------------------------------------------------------------------ gestos sobre el mapa
+// Dos dedos: zoom. Un dedo (o el mouse) con zoom: mover el mapa. Sin zoom: deslizar a los costados cambia
+// de fase y tocar pausa. Rueda del mouse: zoom. Doble click: ver todo.
+const punteros = new Map();
+let toque = null, pellizco = null;
+const local = e => { const r = lienzo.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+function datosPellizco() {
+  const [a, b] = [...punteros.values()];
+  return { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+}
+lienzo.addEventListener("pointerdown", e => {
+  lienzo.setPointerCapture(e.pointerId);
+  punteros.set(e.pointerId, local(e));
+  if (punteros.size === 1) toque = { ...local(e), t: performance.now(), tipo: e.pointerType, movio: false };
+  else { toque = null; pellizco = datosPellizco(); }
 });
-caja.addEventListener("pointercancel", () => { toque = null; });
+lienzo.addEventListener("pointermove", e => {
+  if (!punteros.has(e.pointerId)) return;
+  const antes = punteros.get(e.pointerId), p = local(e);
+  punteros.set(e.pointerId, p);
+  if (punteros.size >= 2 && pellizco) {
+    const ahora = datosPellizco();
+    zoomEn(ahora.d / pellizco.d, ahora.x, ahora.y);
+    vx += ahora.x - pellizco.x; vy += ahora.y - pellizco.y; limitarVista();
+    pellizco = ahora;
+  } else if (punteros.size === 1 && vz > 1.01) {
+    vx += p.x - antes.x; vy += p.y - antes.y; limitarVista();
+  }
+  if (toque && Math.hypot(p.x - toque.x, p.y - toque.y) > 10) toque.movio = true;
+});
+function soltar(e) {
+  if (!punteros.delete(e.pointerId)) return;
+  if (punteros.size < 2) pellizco = null;
+  if (!toque || punteros.size) return;
+  const p = local(e), dx = p.x - toque.x, dy = p.y - toque.y, dur = performance.now() - toque.t;
+  if (vz <= 1.01 && Math.abs(dx) > 50 && Math.abs(dx) > 1.5 * Math.abs(dy)) irA(fase + (dx < 0 ? 1 : -1));
+  else if (toque.tipo !== "mouse" && !toque.movio && dur < 350) alternarPausa();
+  toque = null;
+}
+lienzo.addEventListener("pointerup", soltar);
+lienzo.addEventListener("pointercancel", e => { toque = null; soltar(e); });
+lienzo.addEventListener("wheel", e => {
+  e.preventDefault();
+  const p = local(e);
+  zoomEn(Math.exp(-e.deltaY * 0.0015), p.x, p.y);
+}, { passive: false });
+lienzo.addEventListener("dblclick", verTodo);
+$("z-mas").onclick = () => zoomEn(1.6);
+$("z-menos").onclick = () => zoomEn(1 / 1.6);
+$("z-todo").onclick = verTodo;
 
 const ayuda = () => $("ayuda").textContent = TACTIL.matches
-  ? "Deslizá el mapa a los costados para cambiar de fase · Tocalo para pausar"
-  : "Flechas o control de diapositivas: cambiar de fase · Espacio: pausa · R: repetir · 1 y 2: cambiar de caso";
+  ? "Pellizcá el mapa para hacer zoom · Deslizalo a los costados para cambiar de fase · Tocalo para pausar"
+  : "Flechas o control de diapositivas: cambiar de fase · Espacio: pausa · R: repetir · 1 y 2: cambiar de caso · Rueda del mouse o + y −: zoom · 0: ver todo";
 ayuda(); TACTIL.addEventListener("change", ayuda);
 new ResizeObserver(ajustar).observe(caja);                // también cuando gira el celular o cambia la barra del navegador
 
