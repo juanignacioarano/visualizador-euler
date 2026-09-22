@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hierholzer paso a paso</title>
+<style>
+  :root {
+    --fondo: #0f1830; --panel: #1b2848; --borde: #2e4272;
+    --cian: #00d9ff; --naranja: #e07b39; --texto: #ffffff; --suave: #a9b8d4; --tenue: #6d7fa3;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: radial-gradient(ellipse at 30% 20%, #1e2d55 0%, var(--fondo) 70%);
+    color: var(--texto); font-family: "Segoe UI", Arial, sans-serif;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 24px; border-bottom: 1px solid var(--borde); gap: 16px; flex-wrap: wrap;
+  }
+  header h1 { font-size: 20px; font-weight: 700; }
+  header h1 span { color: var(--cian); }
+  .tabs { display: flex; gap: 8px; }
+  .tab {
+    background: transparent; color: var(--suave); border: 1px solid var(--borde);
+    padding: 8px 16px; border-radius: 8px; font-size: 14px; cursor: pointer; font-family: inherit;
+  }
+  .tab.activa { background: var(--cian); color: #0b1430; border-color: var(--cian); font-weight: 700; }
+  main { flex: 1; display: flex; min-height: 0; }
+  #lienzo-caja { flex: 1; position: relative; min-width: 0; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #leyenda-calle {
+    position: absolute; left: 24px; bottom: 20px; right: 24px; pointer-events: none;
+    font-size: 22px; font-weight: 700; text-shadow: 0 2px 8px rgba(0,0,0,.8);
+  }
+  #leyenda-calle small { display: block; font-size: 14px; font-weight: 400; color: var(--suave); margin-bottom: 2px; }
+  aside {
+    width: 380px; flex-shrink: 0; background: rgba(22,34,63,.85); border-left: 1px solid var(--borde);
+    display: flex; flex-direction: column; padding: 18px 20px; gap: 14px; overflow-y: auto;
+  }
+  .fases { display: flex; flex-direction: column; gap: 4px; }
+  .fase {
+    display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 8px;
+    color: var(--tenue); cursor: pointer; font-size: 14px; border: 1px solid transparent;
+  }
+  .fase b {
+    width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center;
+    border: 1px solid var(--tenue); font-size: 12px; flex-shrink: 0;
+  }
+  .fase.hecha { color: var(--suave); }
+  .fase.hecha b { border-color: var(--cian); color: var(--cian); }
+  .fase.actual { color: var(--texto); background: var(--panel); border-color: var(--borde); font-weight: 600; }
+  .fase.actual b { background: var(--cian); color: #0b1430; border-color: var(--cian); }
+  #titulo-fase { font-size: 22px; font-weight: 700; color: var(--cian); }
+  #texto-fase { font-size: 15.5px; line-height: 1.5; color: #dde5f3; }
+  #texto-fase .conclusion { display: block; margin-top: 8px; color: var(--naranja); font-weight: 700; }
+  .datos { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .dato { background: var(--panel); border: 1px solid var(--borde); border-radius: 10px; padding: 10px 12px; }
+  .dato .v { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .dato .e { font-size: 12px; color: var(--suave); margin-top: 2px; }
+  .dato.naranja .v { color: var(--naranja); }
+  .dato.cian .v { color: var(--cian); }
+  #lista-pasos { display: flex; flex-direction: column; gap: 4px; font-size: 13.5px; }
+  #lista-pasos div { padding: 6px 8px; border-radius: 6px; border-left: 4px solid; background: rgba(27,40,72,.6); color: var(--suave); }
+  #lista-pasos div.actual { color: var(--texto); background: var(--panel); }
+  .controles { display: flex; gap: 8px; align-items: center; margin-top: auto; flex-wrap: wrap; }
+  .controles button {
+    background: var(--panel); color: var(--texto); border: 1px solid var(--borde); border-radius: 8px;
+    padding: 8px 12px; font-size: 14px; cursor: pointer; font-family: inherit;
+  }
+  .controles button:hover { border-color: var(--cian); }
+  .controles label { font-size: 12px; color: var(--suave); display: flex; align-items: center; gap: 6px; }
+  .ayuda { font-size: 11.5px; color: var(--tenue); }
+  sub { font-size: 70%; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Recorridos de Euler · <span>algoritmo de Hierholzer</span></h1>
+  <div class="tabs">
+    <button class="tab" data-caso="ejemplo">Ejemplo del informe</button>
+    <button class="tab" data-caso="barrio">Barrio de la UAI</button>
+  </div>
+</header>
+<main>
+  <div id="lienzo-caja">
+    <canvas id="lienzo"></canvas>
+    <div id="leyenda-calle"></div>
+  </div>
+  <aside>
+    <div class="fases" id="fases"></div>
+    <div id="titulo-fase"></div>
+    <div id="texto-fase"></div>
+    <div class="datos" id="datos"></div>
+    <div id="lista-pasos"></div>
+    <div class="controles">
+      <button id="btn-ant">◀ Fase</button>
+      <button id="btn-pausa">Pausa</button>
+      <button id="btn-sig">Fase ▶</button>
+      <label>Velocidad <input id="vel" type="range" min="0.25" max="4" step="0.25" value="1"></label>
+    </div>
+    <div class="ayuda">Flechas o control de diapositivas: cambiar de fase · Espacio: pausa · R: repetir · 1 y 2: cambiar de caso</div>
+  </aside>
+</main>
+<script>
+const DATOS = {"ejemplo": {"nombre": "Ejemplo del informe", "unidad": "aristas", "vertices": {"A": {"x": 0, "y": 2, "bal": 0, "nombre": "A"}, "B": {"x": 0, "y": 0, "bal": 0, "nombre": "B"}, "C": {"x": 1.6, "y": 1, "bal": 0, "nombre": "C"}, "D": {"x": 3.2, "y": 2, "bal": 0, "nombre": "D"}, "E": {"x": 3.2, "y": 0, "bal": 0, "nombre": "E"}}, "arcos": {"0": {"u": "A", "v": "B", "largo": 1, "calle": "A → B", "zona": true}, "1": {"u": "B", "v": "C", "largo": 1, "calle": "B → C", "zona": true}, "2": {"u": "C", "v": "A", "largo": 1, "calle": "C → A", "zona": true}, "3": {"u": "C", "v": "D", "largo": 1, "calle": "C → D", "zona": true}, "4": {"u": "D", "v": "E", "largo": 1, "calle": "D → E", "zona": true}, "5": {"u": "E", "v": "C", "largo": 1, "calle": "E → C", "zona": true}}, "requeridos": [0, 1, 2, 3, 4, 5], "extra": [], "inicio": "A", "pasos": [{"en": "A", "arcos": [0, 1, 2]}, {"en": "C", "arcos": [3, 4, 5]}], "ruta": [0, 1, 3, 4, 5, 2], "recolecta": [true, true, true, true, true, true]}, "barrio": {"nombre": "Barrio de la UAI", "unidad": "cuadras", "vertices": {"307684867": {"x": -545.7756858270119, "y": -113.55753199978636, "bal": 0, "nombre": "Monseñor Piaggio y Laureano Oliver"}, "307684868": {"x": -504.0327979506067, "y": -84.92602800056972, "bal": 0, "nombre": "Laureano Oliver y Profesor Bassi"}, "308993029": {"x": 50.1006095675586, "y": 124.51141999965643, "bal": 0, "nombre": "Monseñor Chimento y Av. Hipólito Yrigoyen"}, "307682822": {"x": -74.29593953948824, "y": 146.08523599944874, "bal": 0, "nombre": "Monseñor Chimento y Domingo Faustino Sarmiento"}, "307684869": {"x": -459.9398723556767, "y": -56.02735599981287, "bal": 0, "nombre": "Laureano Oliver y Teniente General Ricchieri"}, "308993032": {"x": 72.25680175230885, "y": 251.87263200018577, "bal": 0, "nombre": "Sánchez de Bustamante y Av. Hipólito Yrigoyen"}, "308993033": {"x": 117.39215652953496, "y": 519.6974200001196, "bal": 0, "nombre": "Coronel Ramón Falcón y Av. Hipólito Yrigoyen"}, "308993034": {"x": 93.8460587681733, "y": 380.09100799965836, "bal": 0, "nombre": "Carlos Molina Arrotea y Av. Hipólito Yrigoyen"}, "308107803": {"x": -152.15808417695507, "y": -162.83889599986253, "bal": 0, "nombre": "Coronel Manuel Dorrego y Coronel Pringles"}, "308109867": {"x": -142.74878918776304, "y": -491.33308400007024, "bal": 0, "nombre": "Humberto Primo y Pasaje Julio Sánchez de Gardel"}, "9680522283": {"x": -551.7650815681557, "y": -274.2368200005137, "bal": 0, "nombre": "Av. José Garibaldi"}, "9680522285": {"x": -24.469653440954943, "y": -356.40211200046025, "bal": 0, "nombre": "General Juan Galo de Lavalle y Coronel Manuel Dorrego"}, "308993067": {"x": 21.2509247366419, "y": -141.9886599998253, "bal": 0, "nombre": "Coronel F. Brandsen y Coronel Brandsen"}, "308993074": {"x": 49.625115554148266, "y": 119.62447199949736, "bal": 0, "nombre": "Av. José Garibaldi y Av. Hipólito Yrigoyen"}, "308993076": {"x": 32.82737513145865, "y": -46.57628800010343, "bal": 1, "nombre": "Coronel Pringles y Av. Hipólito Yrigoyen"}, "308104254": {"x": 127.95361008863324, "y": -583.7954760001213, "bal": 0, "nombre": "Coronel Manuel Dorrego y Nicolás Avellaneda"}, "308104255": {"x": 255.7243378650161, "y": -497.3332319997917, "bal": 0, "nombre": "Nicolás Avellaneda y Coronel F. Brandsen"}, "308993091": {"x": 0.10972938761011915, "y": -341.2403280004568, "bal": -1, "nombre": "Av. Hipólito Yrigoyen y General Juan Galo de Lavalle"}, "308102738": {"x": 9.592177301442417, "y": -335.48508400043346, "bal": 1, "nombre": "Av. Hipólito Yrigoyen y General Juan Galo de Lavalle"}, "308102744": {"x": -133.33035008282855, "y": -426.36673200020425, "bal": 0, "nombre": "Vicente Fidel López y Humberto Primo"}, "308102745": {"x": -245.1994607688877, "y": -501.32961999982626, "bal": 0, "nombre": "General Juan Galo de Lavalle"}, "308993118": {"x": 16.36796698734187, "y": -187.28476799999697, "bal": 0, "nombre": "Av. Hipólito Yrigoyen y Manuel A. Fernández"}, "307475040": {"x": -215.1610409057446, "y": 580.188707999894, "bal": 0, "nombre": "Vicente Oliden y Coronel Ramón Falcón"}, "307475041": {"x": -288.9540540852448, "y": 531.519603999854, "bal": 0, "nombre": "Vicente Oliden y Simón Bolívar"}, "308100194": {"x": 337.69219042276967, "y": 157.40647999965688, "bal": 0, "nombre": "General Tomas Guido y Coronel Pringles"}, "308100195": {"x": 332.6629268228897, "y": 20.293635999860555, "bal": 0, "nombre": "General Tomas Guido y Manuel A. Fernández"}, "307475044": {"x": -389.3564437640973, "y": 467.34362399973264, "bal": 0, "nombre": "Vicente Oliden y Av. Carlos Molina Arrotea"}, "307475045": {"x": -450.3202627070069, "y": 431.94386399972814, "bal": 0, "nombre": "Monseñor Piaggio y Vicente Oliden"}, "308100196": {"x": 328.1640219302251, "y": -127.23875999988934, "bal": 0, "nombre": "General Tomas Guido y General Juan Galo de Lavalle"}, "308100197": {"x": 403.1823466049215, "y": -240.16176800017035, "bal": 0, "nombre": "General Tomas Guido y General Paz"}, "308100200": {"x": 473.85721635262615, "y": -351.2034679998226, "bal": 0, "nombre": "General Tomas Guido y Nicolás Avellaneda"}, "9906987105": {"x": 277.0026949495351, "y": 357.47078399950226, "bal": 0, "nombre": "(sin nombre)"}, "9906987111": {"x": 286.5765840194926, "y": 367.12222799997136, "bal": 0, "nombre": "(sin nombre)"}, "307475046": {"x": -598.198900765868, "y": 339.236567999979, "bal": 0, "nombre": "Vicente Oliden"}, "308993132": {"x": -24.56109459772986, "y": -512.1721879999774, "bal": 0, "nombre": "Pasaje Julio Sánchez de Gardel y Av. Hipólito Yrigoyen"}, "12379082349": {"x": 32.571339893918285, "y": -129.3649720002162, "bal": 0, "nombre": "Av. Hipólito Yrigoyen"}, "9906987118": {"x": 234.47341312772448, "y": 364.9737520001753, "bal": 0, "nombre": "Italia y (sin nombre)"}, "12379082350": {"x": 22.933442013763546, "y": -127.39460800012864, "bal": 0, "nombre": "Av. Hipólito Yrigoyen"}, "308101745": {"x": 27.313473403075573, "y": -180.44972000001053, "bal": 0, "nombre": "Coronel F. Brandsen y Manuel A. Fernández"}, "308101747": {"x": -90.91994176502021, "y": -257.850516000438, "bal": -1, "nombre": "Manuel A. Fernández y Coronel Manuel Dorrego"}, "9906987123": {"x": 252.74335616805797, "y": 418.61885999983315, "bal": 0, "nombre": "(sin nombre)"}, "308993144": {"x": -4.444040198859554, "y": -386.4251160001186, "bal": 0, "nombre": "Coronel Manuel Dorrego y Av. Hipólito Yrigoyen"}, "12802706557": {"x": 297.03745230672325, "y": 433.15725199967034, "bal": 0, "nombre": "(sin nombre)"}, "307672702": {"x": -547.5679324917436, "y": -271.44268800029124, "bal": 0, "nombre": "Av. José Garibaldi y Miguel Soler"}, "307672703": {"x": -433.101892964712, "y": -197.29243599988308, "bal": 0, "nombre": "Profesor Bassi y Carlos Guido y Spano"}, "307672704": {"x": -408.595663061437, "y": -181.0063200001872, "bal": 0, "nombre": "Av. José Garibaldi y Simón Bolívar"}, "307672705": {"x": -323.29020829731724, "y": -124.14406400010932, "bal": 0, "nombre": "Vicente Fidel López y Av. José Garibaldi"}, "307672706": {"x": -272.64095179170806, "y": -91.80560400028554, "bal": 0, "nombre": "Av. José Garibaldi y Teniente General Ricchieri"}, "307672707": {"x": -244.79711968076734, "y": -74.2615720001271, "bal": 1, "nombre": "Saavedra y Av. José Garibaldi"}, "307672708": {"x": -218.60837250037062, "y": -57.80847600006183, "bal": -1, "nombre": "Coronel Manuel Dorrego y Av. José Garibaldi"}, "307672709": {"x": -107.04101763056417, "y": 15.161784000003422, "bal": 1, "nombre": "Caseros y Av. José Garibaldi"}, "12802706559": {"x": 291.5418388098251, "y": 412.8524839996797, "bal": 0, "nombre": "(sin nombre)"}, "307672711": {"x": 60.0585514941515, "y": 124.6895320001559, "bal": 1, "nombre": "Av. José Garibaldi y Av. Hipólito Yrigoyen"}, "307672715": {"x": 338.8077725303558, "y": 302.1336119998452, "bal": 0, "nombre": "General Tomas Guido y Av. José Garibaldi"}, "307673240": {"x": 126.6642897845392, "y": 517.6713960001725, "bal": 0, "nombre": "Coronel Ramón Falcón y Av. Hipólito Yrigoyen"}, "307680413": {"x": -302.2861746818235, "y": 452.5603280001974, "bal": 0, "nombre": "Carlos Molina Arrotea y Simón Bolívar"}, "307680414": {"x": -326.1065959128602, "y": 320.50141200013854, "bal": 0, "nombre": "Sánchez de Bustamante y Simón Bolívar"}, "307680415": {"x": -348.4639586419955, "y": 191.31455199963085, "bal": 0, "nombre": "Monseñor Chimento y Simón Bolívar"}, "307680416": {"x": -370.4464126295881, "y": 60.46902399951421, "bal": -1, "nombre": "Caseros y Simón Bolívar"}, "307680417": {"x": -391.5510315169495, "y": -67.8606720004683, "bal": 0, "nombre": "Teniente General Ricchieri y Simón Bolívar"}, "308109478": {"x": -302.7708128109763, "y": -396.5552359998537, "bal": 0, "nombre": "Manuel A. Fernández y Carlos Guido y Spano"}, "308101292": {"x": -365.151969677075, "y": -301.84418000041774, "bal": 0, "nombre": "Carlos Guido y Spano y Coronel Pringles"}, "308099757": {"x": 478.17323893239063, "y": 252.25111999986296, "bal": 0, "nombre": "España y Coronel Pringles"}, "308101293": {"x": -479.151659305789, "y": -375.9721680005657, "bal": 0, "nombre": "Coronel Pringles y Miguel Soler"}, "308103342": {"x": 466.5967885375739, "y": -199.55223200018906, "bal": 0, "nombre": "General Paz y Espora"}, "308099760": {"x": 473.40915468644323, "y": 114.29224399967154, "bal": 0, "nombre": "España y Manuel A. Fernández"}, "308103345": {"x": 53.70339112785733, "y": -471.79642400035505, "bal": 0, "nombre": "General Paz y Coronel Manuel Dorrego"}, "308099762": {"x": 469.65092316047173, "y": -32.939588000520814, "bal": 0, "nombre": "España y General Juan Galo de Lavalle"}, "307680466": {"x": -134.9397144346602, "y": 565.1493759997396, "bal": 0, "nombre": "Saavedra y Coronel Ramón Falcón"}, "307680467": {"x": -158.76013566569688, "y": 425.9993759998662, "bal": 0, "nombre": "Saavedra y Carlos Molina Arrotea"}, "307680468": {"x": -182.25136873325349, "y": 294.71970000021287, "bal": 0, "nombre": "Saavedra y Sánchez de Bustamante"}, "307680469": {"x": -203.10909649816725, "y": 167.1915080001051, "bal": -1, "nombre": "Saavedra y Monseñor Chimento"}, "307680470": {"x": -226.8655089196564, "y": 36.06767999990012, "bal": 0, "nombre": "Saavedra y Caseros"}, "308105427": {"x": 390.56346702780866, "y": -86.43998000006945, "bal": 0, "nombre": "Espora y General Juan Galo de Lavalle"}, "9906987104": {"x": 287.5641485086334, "y": 361.0441560001303, "bal": 0, "nombre": "(sin nombre)"}, "307670259": {"x": 478.2646800891656, "y": 513.7195359998674, "bal": 0, "nombre": "España y Coronel Ramón Falcón"}, "307670260": {"x": 482.10520865616945, "y": 396.47731199973407, "bal": 0, "nombre": "España y Av. José Garibaldi"}, "307679987": {"x": -569.2029100856706, "y": 501.16263999945687, "bal": 0, "nombre": "Av. Carlos Molina Arrotea"}, "12792074494": {"x": 296.03159958674723, "y": -415.7245400000218, "bal": 0, "nombre": "(sin nombre)"}, "12792074495": {"x": 340.2708310322572, "y": -385.59021599985357, "bal": 0, "nombre": "Coronel Suárez y (sin nombre)"}, "12792074503": {"x": 106.99529705185185, "y": -128.4966760003519, "bal": 0, "nombre": "Manuel A. Fernández y (sin nombre)"}, "12792074504": {"x": 141.06627190999168, "y": -181.31801599987483, "bal": 0, "nombre": "(sin nombre)"}, "307669292": {"x": -6.6386279517116655, "y": 542.6516039994326, "bal": 0, "nombre": "Domingo Faustino Sarmiento y Coronel Ramón Falcón"}, "307669293": {"x": -30.40418448829357, "y": 403.2233039994708, "bal": 0, "nombre": "Carlos Molina Arrotea y Domingo Faustino Sarmiento"}, "307669294": {"x": -52.73411487085119, "y": 272.3889079994842, "bal": 1, "nombre": "Sánchez de Bustamante y Domingo Faustino Sarmiento"}, "307669296": {"x": -92.25498264782657, "y": 24.63511599997304, "bal": 0, "nombre": "Domingo Faustino Sarmiento y Coronel F. Brandsen"}, "307669297": {"x": -25.649244358088588, "y": -80.38417200048855, "bal": 0, "nombre": "Coronel F. Brandsen y Coronel Pringles"}, "307669298": {"x": 105.15732980905749, "y": -273.4464479999781, "bal": 1, "nombre": "Coronel F. Brandsen y General Juan Galo de Lavalle"}, "307669299": {"x": 182.3702422366061, "y": -387.1041680001443, "bal": 0, "nombre": "General Paz y Coronel F. Brandsen"}, "8281643836": {"x": -354.416777920819, "y": -572.0846120001058, "bal": 0, "nombre": "Miguel Soler y General Juan Galo de Lavalle"}, "307682148": {"x": 102.11233930255182, "y": 378.9555439998358, "bal": -1, "nombre": "Carlos Molina Arrotea y Av. Hipólito Yrigoyen"}, "10117509492": {"x": -238.82601217110857, "y": -497.16625200021326, "bal": 0, "nombre": "Carlos Guido y Spano y General Juan Galo de Lavalle"}, "12815969661": {"x": -336.58575243092605, "y": 259.93219999945353, "bal": 0, "nombre": "Simón Bolívar y (sin nombre)"}, "12815969662": {"x": -268.9833055369545, "y": 247.98756399987013, "bal": 0, "nombre": "(sin nombre)"}, "308109719": {"x": -194.4770513379885, "y": -325.6110000005265, "bal": 0, "nombre": "Manuel A. Fernández y Vicente Fidel López"}, "308109720": {"x": -255.19397915845045, "y": -229.99825200004494, "bal": 0, "nombre": "Vicente Fidel López y Coronel Pringles"}, "9908698519": {"x": 225.42988276433266, "y": -452.92768400053546, "bal": 0, "nombre": "(sin nombre) y Coronel F. Brandsen"}, "9908698520": {"x": 184.50082117926092, "y": -480.5684400000388, "bal": 0, "nombre": "(sin nombre)"}, "308168097": {"x": -418.51702852635947, "y": -472.48660800051084, "bal": 0, "nombre": "Manuel A. Fernández y Miguel Soler"}, "307670437": {"x": 233.69616329871118, "y": 232.6476680001582, "bal": 1, "nombre": "Coronel Suárez y Av. José Garibaldi"}, "307670438": {"x": 234.43683666540434, "y": 359.7528440000684, "bal": 0, "nombre": "Carlos Molina Arrotea y Italia"}, "307670439": {"x": 235.40611292306022, "y": 500.11623199988406, "bal": 0, "nombre": "Coronel Ramón Falcón y Italia"}, "308101036": {"x": 43.00477583392153, "y": -32.75034399989124, "bal": -1, "nombre": "Coronel Pringles y Av. Hipólito Yrigoyen"}, "307680214": {"x": -441.7522263563758, "y": 477.0729919995304, "bal": 0, "nombre": "Av. Carlos Molina Arrotea y Monseñor Piaggio"}, "307680215": {"x": -510.195931888908, "y": 84.51414399971128, "bal": 0, "nombre": "Monseñor Piaggio y Caseros"}, "307680216": {"x": -532.9739239369989, "y": -42.424051999829544, "bal": 0, "nombre": "Monseñor Piaggio y Teniente General Ricchieri"}, "308107738": {"x": 3.6210697917836603, "y": -397.00051600031145, "bal": 0, "nombre": "Coronel Manuel Dorrego y Av. Hipólito Yrigoyen"}, "308100583": {"x": 231.02608153309848, "y": 88.37694799976674, "bal": 0, "nombre": "Coronel Suárez y Coronel Pringles"}, "308100584": {"x": 227.22212942906444, "y": -50.094000000080996, "bal": 0, "nombre": "Coronel Suárez y Manuel A. Fernández"}, "3827877865": {"x": 30.83395792299158, "y": -144.9052439998968, "bal": -1, "nombre": "Av. Hipólito Yrigoyen y Coronel Brandsen"}, "308100586": {"x": 218.73639011881593, "y": -199.17374400051187, "bal": 0, "nombre": "Coronel Suárez y General Juan Galo de Lavalle"}, "308100587": {"x": 293.17863550888416, "y": -313.58844000003245, "bal": 0, "nombre": "Coronel Suárez y General Paz"}, "308100590": {"x": 365.42629314545053, "y": -424.0512760000388, "bal": 0, "nombre": "Coronel Suárez y Nicolás Avellaneda"}}, "arcos": {"0": {"u": "307670260", "v": "307670259", "largo": 117.2, "calle": "España", "zona": false}, "1": {"u": "307670259", "v": "307670260", "largo": 117.2, "calle": "España", "zona": false}, "2": {"u": "307672707", "v": "307680470", "largo": 111.7, "calle": "Saavedra", "zona": true}, "3": {"u": "307680470", "v": "307680469", "largo": 133.1, "calle": "Saavedra", "zona": true}, "4": {"u": "307680469", "v": "307680468", "largo": 129.1, "calle": "Saavedra", "zona": true}, "5": {"u": "307680468", "v": "307680467", "largo": 133.2, "calle": "Saavedra", "zona": false}, "6": {"u": "307680467", "v": "307680466", "largo": 141.0, "calle": "Saavedra", "zona": false}, "7": {"u": "307475045", "v": "307680215", "largo": 352.4, "calle": "Monseñor Piaggio", "zona": false}, "8": {"u": "307680215", "v": "307475045", "largo": 352.4, "calle": "Monseñor Piaggio", "zona": false}, "9": {"u": "307680215", "v": "307680216", "largo": 128.8, "calle": "Monseñor Piaggio", "zona": false}, "10": {"u": "307680216", "v": "307680215", "largo": 128.8, "calle": "Monseñor Piaggio", "zona": false}, "11": {"u": "307680216", "v": "307684867", "largo": 72.2, "calle": "Monseñor Piaggio", "zona": false}, "12": {"u": "307684867", "v": "307680216", "largo": 72.2, "calle": "Monseñor Piaggio", "zona": false}, "13": {"u": "307669297", "v": "308993067", "largo": 78.2, "calle": "Coronel F. Brandsen", "zona": true}, "15": {"u": "307670259", "v": "307670439", "largo": 243.2, "calle": "Coronel Ramón Falcón", "zona": false}, "16": {"u": "307673240", "v": "308993033", "largo": 9.5, "calle": "Coronel Ramón Falcón", "zona": false}, "17": {"u": "308993033", "v": "307673240", "largo": 9.5, "calle": "Coronel Ramón Falcón", "zona": false}, "18": {"u": "307670438", "v": "307682148", "largo": 133.6, "calle": "Carlos Molina Arrotea", "zona": false}, "19": {"u": "307682148", "v": "307670438", "largo": 133.6, "calle": "Carlos Molina Arrotea", "zona": false}, "20": {"u": "307680214", "v": "307679987", "largo": 129.6, "calle": "Avenida Carlos Molina Arrotea", "zona": false}, "21": {"u": "307679987", "v": "307680214", "largo": 129.6, "calle": "Avenida Carlos Molina Arrotea", "zona": false}, "22": {"u": "307680414", "v": "307680468", "largo": 146.0, "calle": "Sánchez de Bustamante", "zona": false}, "23": {"u": "307680468", "v": "307669294", "largo": 131.3, "calle": "Sánchez de Bustamante", "zona": true}, "24": {"u": "307669294", "v": "308993032", "largo": 126.5, "calle": "Sánchez de Bustamante", "zona": true}, "25": {"u": "308993029", "v": "307682822", "largo": 126.1, "calle": "Monseñor Chimento", "zona": true}, "26": {"u": "307682822", "v": "307680469", "largo": 130.4, "calle": "Monseñor Chimento", "zona": true}, "27": {"u": "307680469", "v": "307680415", "largo": 147.2, "calle": "Monseñor Chimento", "zona": false}, "28": {"u": "307672709", "v": "307680470", "largo": 121.5, "calle": "Caseros", "zona": true}, "29": {"u": "307680470", "v": "307680416", "largo": 145.5, "calle": "Caseros", "zona": true}, "30": {"u": "307680416", "v": "307680215", "largo": 141.6, "calle": "Caseros", "zona": false}, "31": {"u": "307684869", "v": "307684868", "largo": 52.7, "calle": "Laureano Oliver", "zona": false}, "32": {"u": "307684868", "v": "307684867", "largo": 50.6, "calle": "Laureano Oliver", "zona": false}, "33": {"u": "307672703", "v": "307684868", "largo": 132.7, "calle": "Profesor Bassi", "zona": false}, "34": {"u": "307684868", "v": "307672703", "largo": 132.7, "calle": "Profesor Bassi", "zona": false}, "35": {"u": "307670260", "v": "308099757", "largo": 144.1, "calle": "España", "zona": false}, "36": {"u": "308099757", "v": "307670260", "largo": 144.1, "calle": "España", "zona": false}, "37": {"u": "308099757", "v": "308099760", "largo": 137.9, "calle": "España", "zona": false}, "38": {"u": "308099760", "v": "308099757", "largo": 137.9, "calle": "España", "zona": false}, "39": {"u": "308099760", "v": "308099762", "largo": 147.1, "calle": "España", "zona": false}, "40": {"u": "308099762", "v": "308099760", "largo": 147.1, "calle": "España", "zona": false}, "41": {"u": "307672715", "v": "308100194", "largo": 145.0, "calle": "General Tomas Guido", "zona": false}, "42": {"u": "308100194", "v": "308100195", "largo": 137.1, "calle": "General Tomas Guido", "zona": false}, "43": {"u": "308100195", "v": "308100196", "largo": 147.5, "calle": "General Tomas Guido", "zona": false}, "44": {"u": "308100196", "v": "308100197", "largo": 135.4, "calle": "General Tomas Guido", "zona": false}, "45": {"u": "308100197", "v": "308100200", "largo": 131.5, "calle": "General Tomas Guido", "zona": false}, "47": {"u": "307670437", "v": "308100583", "largo": 144.1, "calle": "Coronel Suárez", "zona": true}, "48": {"u": "308100583", "v": "308100584", "largo": 138.4, "calle": "Coronel Suárez", "zona": false}, "49": {"u": "308100584", "v": "308100586", "largo": 149.3, "calle": "Coronel Suárez", "zona": false}, "50": {"u": "308100586", "v": "308100587", "largo": 136.5, "calle": "Coronel Suárez", "zona": false}, "51": {"u": "308100587", "v": "12792074495", "largo": 85.9, "calle": "Coronel Suárez", "zona": false}, "52": {"u": "12792074495", "v": "308100590", "largo": 45.9, "calle": "Coronel Suárez", "zona": false}, "54": {"u": "308099757", "v": "308100194", "largo": 169.3, "calle": "Coronel Pringles", "zona": false}, "55": {"u": "308100194", "v": "308100583", "largo": 126.9, "calle": "Coronel Pringles", "zona": false}, "56": {"u": "308100583", "v": "308101036", "largo": 224.7, "calle": "Coronel Pringles", "zona": true}, "57": {"u": "308101747", "v": "308109719", "largo": 123.6, "calle": "Manuel A. Fernández", "zona": false}, "58": {"u": "308109719", "v": "308109478", "largo": 129.3, "calle": "Manuel A. Fernández", "zona": false}, "59": {"u": "308109478", "v": "308168097", "largo": 138.3, "calle": "Manuel A. Fernández", "zona": false}, "61": {"u": "308103345", "v": "307669299", "largo": 153.9, "calle": "General Paz", "zona": false}, "62": {"u": "307669299", "v": "308100587", "largo": 132.8, "calle": "General Paz", "zona": false}, "63": {"u": "308100587", "v": "308100197", "largo": 132.1, "calle": "General Paz", "zona": false}, "64": {"u": "308100197", "v": "308103342", "largo": 75.2, "calle": "General Paz", "zona": false}, "66": {"u": "308107803", "v": "307672708", "largo": 124.1, "calle": "Coronel Manuel Dorrego", "zona": true}, "67": {"u": "10117509492", "v": "308109478", "largo": 119.1, "calle": "Carlos Guido y Spano", "zona": false}, "68": {"u": "308109478", "v": "308101292", "largo": 113.3, "calle": "Carlos Guido y Spano", "zona": false}, "69": {"u": "308101292", "v": "307672703", "largo": 124.6, "calle": "Carlos Guido y Spano", "zona": false}, "70": {"u": "307672705", "v": "308109720", "largo": 125.7, "calle": "Vicente Fidel López", "zona": false}, "71": {"u": "308109720", "v": "308109719", "largo": 113.1, "calle": "Vicente Fidel López", "zona": false}, "72": {"u": "308109719", "v": "308102744", "largo": 117.8, "calle": "Vicente Fidel López", "zona": false}, "73": {"u": "308102744", "v": "308109867", "largo": 65.7, "calle": "Humberto Primo", "zona": false}, "74": {"u": "308109867", "v": "308102744", "largo": 65.7, "calle": "Humberto Primo", "zona": false}, "75": {"u": "308993132", "v": "308109867", "largo": 119.9, "calle": "Pasaje Julio Sánchez de Gardel", "zona": false}, "76": {"u": "308168097", "v": "8281643836", "largo": 118.4, "calle": "Miguel Soler", "zona": false}, "79": {"u": "308101293", "v": "308101292", "largo": 135.8, "calle": "Coronel Pringles", "zona": false}, "80": {"u": "308101292", "v": "308109720", "largo": 131.2, "calle": "Coronel Pringles", "zona": false}, "81": {"u": "308109720", "v": "308107803", "largo": 122.9, "calle": "Coronel Pringles", "zona": false}, "82": {"u": "308993034", "v": "307669293", "largo": 126.2, "calle": "Carlos Molina Arrotea", "zona": false}, "83": {"u": "307669293", "v": "307680467", "largo": 130.2, "calle": "Carlos Molina Arrotea", "zona": false}, "84": {"u": "307680467", "v": "307680413", "largo": 145.8, "calle": "Carlos Molina Arrotea", "zona": false}, "85": {"u": "8281643836", "v": "308102745", "largo": 130.0, "calle": "General Juan Galo de Lavalle", "zona": false}, "86": {"u": "308102745", "v": "10117509492", "largo": 7.6, "calle": "General Juan Galo de Lavalle", "zona": false}, "87": {"u": "10117509492", "v": "308102744", "largo": 126.9, "calle": "General Juan Galo de Lavalle", "zona": false}, "88": {"u": "308102744", "v": "9680522285", "largo": 129.3, "calle": "General Juan Galo de Lavalle", "zona": false}, "89": {"u": "9680522283", "v": "307672702", "largo": 5.0, "calle": "Avenida José Garibaldi", "zona": false}, "90": {"u": "307672702", "v": "9680522283", "largo": 5.0, "calle": "Avenida José Garibaldi", "zona": false}, "91": {"u": "307672702", "v": "307672703", "largo": 136.2, "calle": "Avenida José Garibaldi", "zona": false}, "92": {"u": "307672703", "v": "307672702", "largo": 136.2, "calle": "Avenida José Garibaldi", "zona": false}, "93": {"u": "307672703", "v": "307672704", "largo": 29.4, "calle": "Avenida José Garibaldi", "zona": false}, "94": {"u": "307672704", "v": "307672703", "largo": 29.4, "calle": "Avenida José Garibaldi", "zona": false}, "95": {"u": "307672704", "v": "307672705", "largo": 102.4, "calle": "Avenida José Garibaldi", "zona": false}, "96": {"u": "307672705", "v": "307672704", "largo": 102.4, "calle": "Avenida José Garibaldi", "zona": false}, "97": {"u": "307672705", "v": "307672706", "largo": 60.0, "calle": "Avenida José Garibaldi", "zona": false}, "98": {"u": "307672706", "v": "307672705", "largo": 60.0, "calle": "Avenida José Garibaldi", "zona": false}, "99": {"u": "307672706", "v": "307672707", "largo": 32.9, "calle": "Avenida José Garibaldi", "zona": true}, "100": {"u": "307672707", "v": "307672706", "largo": 32.9, "calle": "Avenida José Garibaldi", "zona": true}, "102": {"u": "308103342", "v": "308105427", "largo": 136.1, "calle": "Espora", "zona": false}, "105": {"u": "308100200", "v": "308100590", "largo": 130.5, "calle": "Nicolás Avellaneda", "zona": false}, "106": {"u": "308100590", "v": "308104255", "largo": 131.8, "calle": "Nicolás Avellaneda", "zona": false}, "108": {"u": "308993118", "v": "308993091", "largo": 154.7, "calle": "Avenida Hipólito Yrigoyen", "zona": true}, "109": {"u": "308104254", "v": "308103345", "largo": 134.2, "calle": "Coronel Manuel Dorrego", "zona": false}, "110": {"u": "308103345", "v": "308104254", "largo": 134.2, "calle": "Coronel Manuel Dorrego", "zona": false}, "111": {"u": "308103345", "v": "308107738", "largo": 89.9, "calle": "Coronel Manuel Dorrego", "zona": false}, "112": {"u": "308107738", "v": "308103345", "largo": 89.9, "calle": "Coronel Manuel Dorrego", "zona": false}, "113": {"u": "307669292", "v": "307669293", "largo": 141.3, "calle": "Domingo Faustino Sarmiento", "zona": false}, "114": {"u": "307669293", "v": "307669294", "largo": 132.6, "calle": "Domingo Faustino Sarmiento", "zona": false}, "115": {"u": "307669294", "v": "307682822", "largo": 128.0, "calle": "Domingo Faustino Sarmiento", "zona": true}, "116": {"u": "307682822", "v": "307669296", "largo": 122.7, "calle": "Domingo Faustino Sarmiento", "zona": true}, "118": {"u": "307475040", "v": "307475041", "largo": 88.3, "calle": "Vicente Oliden", "zona": false}, "119": {"u": "307475041", "v": "307475040", "largo": 88.3, "calle": "Vicente Oliden", "zona": false}, "120": {"u": "307475041", "v": "307475044", "largo": 119.0, "calle": "Vicente Oliden", "zona": false}, "121": {"u": "307475044", "v": "307475041", "largo": 119.0, "calle": "Vicente Oliden", "zona": false}, "122": {"u": "307475040", "v": "307680466", "largo": 81.5, "calle": "Coronel Ramón Falcón", "zona": false}, "123": {"u": "307680466", "v": "307669292", "largo": 130.1, "calle": "Coronel Ramón Falcón", "zona": false}, "124": {"u": "307669292", "v": "308993033", "largo": 126.0, "calle": "Coronel Ramón Falcón", "zona": false}, "125": {"u": "307672711", "v": "307670437", "largo": 204.5, "calle": "Av. José Garibaldi", "zona": true}, "126": {"u": "307670437", "v": "307672711", "largo": 204.5, "calle": "Av. José Garibaldi", "zona": true}, "127": {"u": "307670437", "v": "307672715", "largo": 125.9, "calle": "Av. José Garibaldi", "zona": false}, "128": {"u": "307672715", "v": "307670437", "largo": 125.9, "calle": "Av. José Garibaldi", "zona": false}, "129": {"u": "307672715", "v": "307670260", "largo": 171.4, "calle": "Av. José Garibaldi", "zona": false}, "130": {"u": "307670260", "v": "307672715", "largo": 171.4, "calle": "Av. José Garibaldi", "zona": false}, "131": {"u": "307669298", "v": "308101745", "largo": 124.4, "calle": "Coronel F. Brandsen", "zona": true}, "132": {"u": "307669296", "v": "307669297", "largo": 124.3, "calle": "Coronel F. Brandsen", "zona": true}, "133": {"u": "308101745", "v": "308993118", "largo": 12.9, "calle": "Manuel A. Fernández", "zona": true}, "134": {"u": "308101745", "v": "12792074503", "largo": 95.0, "calle": "Manuel A. Fernández", "zona": true}, "135": {"u": "12792074503", "v": "308101745", "largo": 95.0, "calle": "Manuel A. Fernández", "zona": true}, "136": {"u": "12792074503", "v": "308100584", "largo": 143.4, "calle": "Manuel A. Fernández", "zona": false}, "137": {"u": "308100584", "v": "12792074503", "largo": 143.4, "calle": "Manuel A. Fernández", "zona": false}, "138": {"u": "308100584", "v": "308100195", "largo": 126.6, "calle": "Manuel A. Fernández", "zona": false}, "139": {"u": "308100195", "v": "308100584", "largo": 126.6, "calle": "Manuel A. Fernández", "zona": false}, "140": {"u": "308100195", "v": "308099760", "largo": 169.1, "calle": "Manuel A. Fernández", "zona": false}, "141": {"u": "308099760", "v": "308100195", "largo": 169.1, "calle": "Manuel A. Fernández", "zona": false}, "142": {"u": "307670439", "v": "307673240", "largo": 110.0, "calle": "Coronel Ramón Falcón", "zona": false}, "143": {"u": "307670439", "v": "9906987118", "largo": 135.0, "calle": "Italia", "zona": false}, "144": {"u": "9906987118", "v": "307670438", "largo": 5.2, "calle": "Italia", "zona": false}, "145": {"u": "307670438", "v": "307670437", "largo": 127.0, "calle": "Italia", "zona": false}, "146": {"u": "307680216", "v": "307684869", "largo": 74.2, "calle": "Teniente General Ricchieri", "zona": false}, "147": {"u": "307684869", "v": "307680417", "largo": 69.3, "calle": "Teniente General Ricchieri", "zona": false}, "148": {"u": "307680417", "v": "307672706", "largo": 121.9, "calle": "Teniente General Ricchieri", "zona": false}, "150": {"u": "307475041", "v": "307680413", "largo": 80.0, "calle": "Simón Bolívar", "zona": false}, "151": {"u": "307680413", "v": "307680414", "largo": 134.0, "calle": "Simón Bolívar", "zona": false}, "152": {"u": "307680414", "v": "12815969661", "largo": 61.4, "calle": "Simón Bolívar", "zona": false}, "153": {"u": "12815969661", "v": "307680415", "largo": 69.6, "calle": "Simón Bolívar", "zona": false}, "154": {"u": "307680415", "v": "307680416", "largo": 132.5, "calle": "Simón Bolívar", "zona": false}, "155": {"u": "307680416", "v": "307680417", "largo": 129.9, "calle": "Simón Bolívar", "zona": false}, "156": {"u": "307680417", "v": "307672704", "largo": 114.5, "calle": "Simón Bolívar", "zona": false}, "157": {"u": "308993074", "v": "307672711", "largo": 11.6, "calle": "Av. José Garibaldi", "zona": true}, "158": {"u": "307672711", "v": "308993074", "largo": 11.6, "calle": "Av. José Garibaldi", "zona": true}, "159": {"u": "308993029", "v": "308993074", "largo": 4.9, "calle": "Avenida Hipólito Yrigoyen", "zona": true}, "160": {"u": "308993033", "v": "308993034", "largo": 141.4, "calle": "Avenida Hipólito Yrigoyen", "zona": false}, "161": {"u": "308993034", "v": "308993032", "largo": 129.9, "calle": "Avenida Hipólito Yrigoyen", "zona": false}, "162": {"u": "308993032", "v": "308993029", "largo": 129.1, "calle": "Avenida Hipólito Yrigoyen", "zona": true}, "163": {"u": "307682148", "v": "307673240", "largo": 140.7, "calle": "Avenida Hipólito Yrigoyen", "zona": false}, "164": {"u": "307672711", "v": "307682148", "largo": 257.4, "calle": "Avenida Hipólito Yrigoyen", "zona": true}, "165": {"u": "307672711", "v": "308993029", "largo": 9.9, "calle": "Monseñor Chimento", "zona": true}, "166": {"u": "308101036", "v": "307672711", "largo": 158.2, "calle": "Avenida Hipólito Yrigoyen", "zona": true}, "167": {"u": "3827877865", "v": "12379082349", "largo": 15.6, "calle": "Avenida Hipólito Yrigoyen", "zona": true}, "168": {"u": "308993118", "v": "308101747", "largo": 128.3, "calle": "Manuel A. Fernández", "zona": true}, "169": {"u": "308102738", "v": "308101745", "largo": 155.9, "calle": "Avenida Hipólito Yrigoyen", "zona": true}, "170": {"u": "308107738", "v": "308102738", "largo": 61.7, "calle": "Avenida Hipólito Yrigoyen", "zona": false}, "171": {"u": "308107738", "v": "308993144", "largo": 13.3, "calle": "Coronel Manuel Dorrego", "zona": false}, "172": {"u": "308993144", "v": "308107738", "largo": 13.3, "calle": "Coronel Manuel Dorrego", "zona": false}, "174": {"u": "307672707", "v": "307672708", "largo": 30.9, "calle": "Av. José Garibaldi", "zona": true}, "175": {"u": "307672708", "v": "307672707", "largo": 30.9, "calle": "Av. José Garibaldi", "zona": true}, "176": {"u": "307669296", "v": "308993074", "largo": 170.6, "calle": "Av. José Garibaldi", "zona": true}, "177": {"u": "308993074", "v": "307669296", "largo": 170.6, "calle": "Av. José Garibaldi", "zona": true}, "178": {"u": "307475044", "v": "307475045", "largo": 70.4, "calle": "Vicente Oliden", "zona": false}, "179": {"u": "307475045", "v": "307475044", "largo": 70.4, "calle": "Vicente Oliden", "zona": false}, "180": {"u": "307672708", "v": "307672709", "largo": 133.2, "calle": "Av. José Garibaldi", "zona": true}, "181": {"u": "307672709", "v": "307672708", "largo": 133.2, "calle": "Av. José Garibaldi", "zona": true}, "182": {"u": "307672709", "v": "307669296", "largo": 17.5, "calle": "Av. José Garibaldi", "zona": true}, "183": {"u": "307669296", "v": "307672709", "largo": 17.5, "calle": "Av. José Garibaldi", "zona": true}, "184": {"u": "308993144", "v": "9680522285", "largo": 36.0, "calle": "Coronel Manuel Dorrego", "zona": false}, "185": {"u": "9680522285", "v": "308993144", "largo": 36.0, "calle": "Coronel Manuel Dorrego", "zona": false}, "186": {"u": "9680522285", "v": "308993091", "largo": 28.8, "calle": "General Juan Galo de Lavalle", "zona": false}, "187": {"u": "308993144", "v": "308993132", "largo": 127.2, "calle": "Avenida Hipólito Yrigoyen", "zona": false}, "188": {"u": "308993091", "v": "308102738", "largo": 11.1, "calle": "General Juan Galo de Lavalle", "zona": false}, "189": {"u": "308102738", "v": "307669298", "largo": 113.8, "calle": "General Juan Galo de Lavalle", "zona": false}, "190": {"u": "307669298", "v": "308100586", "largo": 135.6, "calle": "General Juan Galo de Lavalle", "zona": false}, "191": {"u": "308100586", "v": "308100196", "largo": 130.8, "calle": "General Juan Galo de Lavalle", "zona": false}, "192": {"u": "308100196", "v": "308105427", "largo": 74.5, "calle": "General Juan Galo de Lavalle", "zona": false}, "193": {"u": "308105427", "v": "308099762", "largo": 95.4, "calle": "General Juan Galo de Lavalle", "zona": false}, "194": {"u": "307670438", "v": "9906987105", "largo": 42.7, "calle": "(sin nombre)", "zona": false}, "195": {"u": "9906987105", "v": "9906987104", "largo": 11.7, "calle": "(sin nombre)", "zona": false}, "196": {"u": "9906987105", "v": "9906987104", "largo": 33.7, "calle": "(sin nombre)", "zona": false}, "197": {"u": "9906987104", "v": "9906987111", "largo": 6.2, "calle": "(sin nombre)", "zona": false}, "198": {"u": "9906987111", "v": "9906987118", "largo": 54.1, "calle": "(sin nombre)", "zona": false}, "199": {"u": "9906987111", "v": "12802706559", "largo": 46.3, "calle": "(sin nombre)", "zona": false}, "200": {"u": "12802706559", "v": "9906987111", "largo": 46.3, "calle": "(sin nombre)", "zona": false}, "201": {"u": "12802706559", "v": "12802706557", "largo": 21.3, "calle": "(sin nombre)", "zona": false}, "202": {"u": "12802706557", "v": "12802706559", "largo": 21.3, "calle": "(sin nombre)", "zona": false}, "203": {"u": "9908698519", "v": "9908698520", "largo": 49.3, "calle": "(sin nombre)", "zona": false}, "204": {"u": "9908698520", "v": "9908698519", "largo": 49.3, "calle": "(sin nombre)", "zona": false}, "205": {"u": "9680522285", "v": "308101747", "largo": 118.7, "calle": "Coronel Manuel Dorrego", "zona": false}, "206": {"u": "308101747", "v": "9680522285", "largo": 118.7, "calle": "Coronel Manuel Dorrego", "zona": false}, "207": {"u": "308993076", "v": "307669297", "largo": 67.6, "calle": "Coronel Pringles", "zona": true}, "208": {"u": "307475044", "v": "307680214", "largo": 53.2, "calle": "Avenida Carlos Molina Arrotea", "zona": false}, "209": {"u": "307680214", "v": "307475044", "largo": 53.2, "calle": "Avenida Carlos Molina Arrotea", "zona": false}, "210": {"u": "307680214", "v": "307475045", "largo": 45.9, "calle": "Monseñor Piaggio", "zona": false}, "211": {"u": "307475045", "v": "307680214", "largo": 45.9, "calle": "Monseñor Piaggio", "zona": false}, "212": {"u": "308993067", "v": "3827877865", "largo": 10.0, "calle": "Coronel Brandsen", "zona": true}, "213": {"u": "12379082349", "v": "308101036", "largo": 97.1, "calle": "Avenida Hipólito Yrigoyen", "zona": true}, "214": {"u": "308101745", "v": "3827877865", "largo": 35.7, "calle": "Avenida Hipólito Yrigoyen", "zona": true}, "215": {"u": "12379082350", "v": "308993067", "largo": 14.7, "calle": "Avenida Hipólito Yrigoyen", "zona": true}, "216": {"u": "308993074", "v": "308993076", "largo": 166.9, "calle": "Avenida Hipólito Yrigoyen", "zona": true}, "217": {"u": "308993076", "v": "12379082350", "largo": 81.3, "calle": "Avenida Hipólito Yrigoyen", "zona": true}, "218": {"u": "307672702", "v": "308101293", "largo": 124.8, "calle": "Miguel Soler", "zona": false}, "219": {"u": "308101293", "v": "308168097", "largo": 113.9, "calle": "Miguel Soler", "zona": false}, "220": {"u": "307475045", "v": "307475046", "largo": 174.4, "calle": "Vicente Oliden", "zona": false}, "221": {"u": "307475046", "v": "307475045", "largo": 174.4, "calle": "Vicente Oliden", "zona": false}, "222": {"u": "12792074494", "v": "12792074495", "largo": 53.5, "calle": "(sin nombre)", "zona": false}, "223": {"u": "12792074495", "v": "12792074494", "largo": 53.5, "calle": "(sin nombre)", "zona": false}, "224": {"u": "12792074503", "v": "12792074504", "largo": 62.8, "calle": "(sin nombre)", "zona": false}, "225": {"u": "12792074504", "v": "12792074503", "largo": 62.8, "calle": "(sin nombre)", "zona": false}, "226": {"u": "12802706559", "v": "9906987123", "largo": 39.7, "calle": "(sin nombre)", "zona": false}, "227": {"u": "9906987123", "v": "12802706559", "largo": 39.7, "calle": "(sin nombre)", "zona": false}, "228": {"u": "308104255", "v": "308104254", "largo": 154.1, "calle": "Nicolás Avellaneda", "zona": false}, "229": {"u": "308104255", "v": "9908698519", "largo": 53.7, "calle": "Coronel F. Brandsen", "zona": false}, "230": {"u": "9908698519", "v": "307669299", "largo": 78.6, "calle": "Coronel F. Brandsen", "zona": false}, "231": {"u": "307669299", "v": "307669298", "largo": 137.2, "calle": "Coronel F. Brandsen", "zona": false}, "232": {"u": "308101747", "v": "308107803", "largo": 112.9, "calle": "Coronel Manuel Dorrego", "zona": false}, "233": {"u": "307669297", "v": "308107803", "largo": 150.8, "calle": "Coronel Pringles", "zona": true}, "234": {"u": "12815969661", "v": "12815969662", "largo": 68.6, "calle": "(sin nombre)", "zona": false}, "235": {"u": "12815969662", "v": "12815969661", "largo": 68.6, "calle": "(sin nombre)", "zona": false}, "236": {"u": "308993067", "v": "308993118", "largo": 45.5, "calle": "Avenida Hipólito Yrigoyen", "zona": true}, "237": {"u": "308993091", "v": "308993144", "largo": 45.4, "calle": "Avenida Hipólito Yrigoyen", "zona": false}}, "requeridos": [2, 3, 4, 13, 23, 24, 25, 26, 28, 29, 47, 56, 66, 99, 100, 108, 115, 116, 125, 126, 131, 132, 133, 134, 135, 157, 158, 159, 162, 164, 165, 166, 167, 168, 169, 174, 175, 176, 177, 180, 181, 182, 183, 207, 212, 213, 214, 215, 216, 217, 233, 236], "extra": [4, 23, 145, 19, 155, 166, 166, 206, 180, 186, 99, 188, 188, 158, 148, 216, 167, 213, 189], "inicio": "308101036", "pasos": [{"en": "308101036", "arcos": [166, 125, 47, 56, 166, 158, 157, 164, 19, 145, 126, 165, 25, 26, 4, 23, 24, 162, 159, 177, 132, 13, 212, 167, 213, 166, 158, 216, 207, 233, 66, 175, 2, 3, 4, 23, 115, 116, 176, 216, 217, 215, 236, 108, 188, 169, 133, 168, 206, 186, 188, 189, 131, 134, 135, 214, 167, 213]}, {"en": "307669296", "arcos": [183, 28, 29, 155, 148, 99, 100, 99, 174, 180, 181, 180, 182]}], "ruta": [166, 125, 47, 56, 166, 158, 157, 164, 19, 145, 126, 165, 25, 26, 4, 23, 24, 162, 159, 177, 183, 28, 29, 155, 148, 99, 100, 99, 174, 180, 181, 180, 182, 132, 13, 212, 167, 213, 166, 158, 216, 207, 233, 66, 175, 2, 3, 4, 23, 115, 116, 176, 216, 217, 215, 236, 108, 188, 169, 133, 168, 206, 186, 188, 189, 131, 134, 135, 214, 167, 213], "recolecta": [true, true, true, true, false, true, true, true, false, false, true, true, true, true, true, true, true, true, true, true, true, true, true, false, false, true, true, false, true, true, true, false, true, true, true, true, true, true, false, false, true, true, true, true, true, true, true, false, false, true, true, true, false, true, true, true, true, false, true, true, true, false, false, false, false, true, true, true, true, false, false]}};
+
+const FASES = ["El dígrafo", "Balance de cada vértice", "Pasadas extra", "Hierholzer: armar el circuito", "Recorrido completo"];
+const COLORES_PASO = ["#00d9ff", "#e07b39", "#d65bff", "#f2c14e", "#5fe39a", "#ff6b8b"];
+
+const lienzo = document.getElementById("lienzo");
+const ctx = lienzo.getContext("2d");
+let caso, D, fase = 0, t = 0, pausa = false, ultimo = performance.now();
+let esc, ox, oy, radio, grosor, esDoble;
+
+const fmtKm = m => (m / 1000 + 1e-9).toFixed(2).replace(".", ",") + " km";  // el 1e-9 evita que 6,325 se redondee para abajo
+const suma = ids => ids.reduce((s, i) => s + D.arcos[i].largo, 0);
+const clave = (u, v) => u + ">" + v;
+
+// ------------------------------------------------------------------ preparación de un caso
+function cargar(nombre) {
+  caso = nombre; D = DATOS[nombre];
+  document.querySelectorAll(".tab").forEach(b => b.classList.toggle("activa", b.dataset.caso === nombre));
+  const pares = new Set(Object.values(D.arcos).map(a => clave(a.u, a.v)));
+  esDoble = a => pares.has(clave(a.v, a.u));
+  D.velocidad = nombre === "ejemplo" ? 0.9 : 6;          // arcos por segundo
+  D.zonaV = new Set(D.requeridos.flatMap(i => [D.arcos[i].u, D.arcos[i].v]));
+  D.acum = [0];                                           // metros acumulados en la ruta
+  D.ruta.forEach((i, k) => D.acum.push(D.acum[k] + D.arcos[i].largo));
+  D.acumJ = [0];                                          // metros acumulados recolectando
+  D.ruta.forEach((i, k) => D.acumJ.push(D.acumJ[k] + (D.recolecta[k] ? D.arcos[i].largo : 0)));
+  let n = 0;
+  D.inicioPaso = D.pasos.map(p => { const s = n; n += p.arcos.length; return s; });
+  D.totalPasos = n;
+  ajustar(); irA(0);
+}
+
+function ajustar() {
+  const r = lienzo.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  lienzo.width = r.width * dpr; lienzo.height = r.height * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const pts = [...D.zonaV].map(v => D.vertices[v]);
+  const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+  const margen = caso === "ejemplo" ? 0.6 : 60;
+  const minx = Math.min(...xs) - margen, maxx = Math.max(...xs) + margen;
+  const miny = Math.min(...ys) - margen, maxy = Math.max(...ys) + margen;
+  const w = r.width, h = r.height - 70;
+  esc = Math.min(w / (maxx - minx), h / (maxy - miny));
+  ox = (w - esc * (maxx - minx)) / 2 - esc * minx;
+  oy = 10 + (h - esc * (maxy - miny)) / 2 + esc * maxy;
+  radio = caso === "ejemplo" ? 24 : 4.5;
+  grosor = caso === "ejemplo" ? 6 : 3;
+}
+const P = v => [ox + esc * D.vertices[v].x, oy - esc * D.vertices[v].y];
+
+// ------------------------------------------------------------------ dibujo
+function puntos(i, corr) {
+  const a = D.arcos[i];
+  let [x1, y1] = P(a.u), [x2, y2] = P(a.v);
+  const dx = x2 - x1, dy = y2 - y1, n = Math.hypot(dx, dy) || 1;
+  const c = corr ?? (esDoble(a) ? grosor * 0.9 : 0);      // las dos manos de una calle, una a cada lado
+  x1 += -dy / n * c; y1 += dx / n * c; x2 += -dy / n * c; y2 += dx / n * c;
+  const recorte = caso === "ejemplo" ? radio + 4 : 0;
+  return [x1 + dx / n * recorte, y1 + dy / n * recorte, x2 - dx / n * recorte, y2 - dy / n * recorte];
+}
+
+function linea(i, color, ancho, opts = {}) {
+  const [x1, y1, x2, y2] = puntos(i, opts.corr);
+  const f = opts.hasta ?? 1;
+  ctx.save();
+  ctx.strokeStyle = color; ctx.lineWidth = ancho; ctx.lineCap = "round";
+  if (opts.punteada) ctx.setLineDash([ancho * 2, ancho * 1.6]);
+  if (opts.brillo) { ctx.shadowColor = color; ctx.shadowBlur = opts.brillo; }
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 + (x2 - x1) * f, y1 + (y2 - y1) * f); ctx.stroke();
+  ctx.restore();
+  if (opts.flecha && f > 0.55) flecha(x1, y1, x2, y2, color, 0.55);
+}
+
+function flecha(x1, y1, x2, y2, color, en) {
+  const x = x1 + (x2 - x1) * en, y = y1 + (y2 - y1) * en, ang = Math.atan2(y2 - y1, x2 - x1);
+  const s = caso === "ejemplo" ? 16 : 7;
+  ctx.save(); ctx.fillStyle = color; ctx.translate(x, y); ctx.rotate(ang);
+  ctx.beginPath(); ctx.moveTo(s, 0); ctx.lineTo(-s * 0.7, s * 0.65); ctx.lineTo(-s * 0.7, -s * 0.65); ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+
+function vertice(v, color, r, texto, colorTexto = "#fff") {
+  const [x, y] = P(v);
+  ctx.save();
+  ctx.fillStyle = caso === "ejemplo" ? "#0e1733" : color; ctx.strokeStyle = color;
+  ctx.lineWidth = caso === "ejemplo" ? 5 : 0;
+  ctx.beginPath(); ctx.arc(x, y, r, 0, 2 * Math.PI); ctx.fill(); if (ctx.lineWidth) ctx.stroke();
+  if (texto) {
+    ctx.fillStyle = colorTexto; ctx.font = `700 ${caso === "ejemplo" ? 20 : 13}px Segoe UI, Arial`;
+    ctx.textAlign = caso === "ejemplo" ? "center" : "left"; ctx.textBaseline = "middle";
+    if (caso === "ejemplo") ctx.fillText(texto, x, y + 1); else ctx.fillText(texto, x + r + 3, y - r - 3);
+  }
+  ctx.restore();
+}
+
+function anillo(v, color, avance) {
+  const [x, y] = P(v);
+  ctx.save(); ctx.strokeStyle = color; ctx.globalAlpha = 1 - avance; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.arc(x, y, radio + 6 + avance * (caso === "ejemplo" ? 30 : 26), 0, 2 * Math.PI); ctx.stroke();
+  ctx.restore();
+}
+
+function fondo() {
+  ctx.clearRect(0, 0, lienzo.width, lienzo.height);
+  for (const i in D.arcos) if (!D.arcos[i].zona) linea(i, "#26375f", 1.5);
+}
+
+function base(colorArco, alfa) {
+  ctx.globalAlpha = alfa;
+  D.requeridos.forEach(i => linea(i, colorArco, grosor, { flecha: true }));
+  ctx.globalAlpha = 1;
+}
+
+function vertices(modo) {
+  for (const v of D.zonaV) {
+    const b = D.vertices[v].bal;
+    if (modo === "balance" && b !== 0) {
+      const c = b > 0 ? "#e07b39" : "#f2c14e";
+      vertice(v, c, caso === "ejemplo" ? radio : 8, (b > 0 ? "+" : "−") + Math.abs(b), c);
+    } else if (caso === "ejemplo") {
+      vertice(v, modo === "balance" ? "#5fe39a" : "#00d9ff", radio, D.vertices[v].nombre);
+    } else {
+      vertice(v, "#00d9ff", radio);
+    }
+  }
+}
+
+function marcaInicio() {
+  if (caso !== "barrio") return;
+  const [x, y] = P(D.inicio);
+  ctx.save(); ctx.fillStyle = "#fff"; ctx.shadowColor = "#fff"; ctx.shadowBlur = 12; ctx.beginPath();
+  for (let k = 0; k < 10; k++) {
+    const a = -Math.PI / 2 + k * Math.PI / 5, rr = k % 2 ? 5 : 11;
+    ctx.lineTo(x + rr * Math.cos(a), y + rr * Math.sin(a));
+  }
+  ctx.closePath(); ctx.fill();
+  ctx.shadowBlur = 0; ctx.font = "700 14px Segoe UI, Arial"; ctx.fillText("UAI", x + 14, y + 18);
+  ctx.restore();
+}
+
+function camion(x, y, ang) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(ang);
+  const s = caso === "ejemplo" ? 1.6 : 1.4;
+  ctx.shadowColor = "#e07b39"; ctx.shadowBlur = 16;
+  ctx.fillStyle = "#e07b39"; ctx.fillRect(-12 * s, -7 * s, 16 * s, 14 * s);   // caja
+  ctx.fillStyle = "#ffffff"; ctx.fillRect(4 * s, -6 * s, 8 * s, 12 * s);      // cabina
+  ctx.fillStyle = "#0e1733"; ctx.fillRect(9 * s, -4.5 * s, 2.5 * s, 9 * s);   // parabrisas
+  ctx.restore();
+}
+
+// ------------------------------------------------------------------ panel lateral
+function panel() {
+  document.getElementById("fases").innerHTML = FASES.map((f, k) =>
+    `<div class="fase ${k === fase ? "actual" : k < fase ? "hecha" : ""}" data-k="${k}"><b>${k + 1}</b>${f}</div>`).join("");
+  document.querySelectorAll(".fase").forEach(el => el.onclick = () => irA(+el.dataset.k));
+  document.getElementById("titulo-fase").textContent = FASES[fase];
+  const nV = D.zonaV.size, nA = D.requeridos.length, u = D.unidad;
+  const desb = [...D.zonaV].filter(v => D.vertices[v].bal !== 0).length;
+  const txt = document.getElementById("texto-fase"), datos = document.getElementById("datos");
+  const dato = (v, e, cl = "") => `<div class="dato ${cl}"><div class="v">${v}</div><div class="e">${e}</div></div>`;
+  document.getElementById("lista-pasos").innerHTML = "";
+  if (fase === 0) {
+    txt.innerHTML = caso === "ejemplo"
+      ? "Dos triángulos que comparten el vértice C. Cada arco tiene un sentido: es un dígrafo."
+      : "Calles reales alrededor de la sede de Lomas de Zamora, bajadas de OpenStreetMap. Cada esquina es un vértice y cada cuadra un arco, en el sentido de circulación. Las calles doble mano tienen un arco por cada lado.";
+    datos.innerHTML = dato(nV, "vértices") + dato(nA, caso === "ejemplo" ? "arcos" : "cuadras a recolectar") +
+      (caso === "barrio" ? dato(fmtKm(suma(D.requeridos)), "largo de las cuadras", "cian") + dato("500 m", "lado de la zona") : "");
+  } else if (fase === 1) {
+    txt.innerHTML = "En cada vértice se calcula g<sub>s</sub>(v) − g<sub>e</sub>(v). Para que exista un circuito euleriano tienen que dar todos 0." +
+      (desb ? `<span class="conclusion">${desb} vértices desbalanceados: no hay circuito euleriano.</span>`
+            : `<span class="conclusion" style="color:#5fe39a">Todos balanceados: hay circuito euleriano.</span>`);
+    datos.innerHTML = dato(nV - desb, "balanceados", "cian") + dato(desb, "desbalanceados", "naranja");
+  } else if (fase === 2) {
+    txt.innerHTML = D.extra.length
+      ? "Para balancear, el camión tiene que pasar de más por algunas cuadras. El programa elige las que suman menos metros (problema del cartero chino)."
+      : "No hace falta repetir ningún arco: el dígrafo ya está balanceado.";
+    datos.innerHTML = dato(D.extra.length, "pasadas extra", "naranja") +
+      (caso === "barrio" ? dato(fmtKm(suma(D.extra)), "de recorrido extra", "naranja") : "");
+  } else if (fase === 3) {
+    txt.innerHTML = "Se arma un circuito desde el inicio. Mientras queden arcos sin usar, se busca un vértice del circuito que tenga arcos libres, se arma otro circuito desde ahí y se empalma.";
+    datos.innerHTML = dato(D.pasos.length - 1, "subcircuitos empalmados", "cian") + dato(D.totalPasos, u + " en total");
+    document.getElementById("lista-pasos").innerHTML = D.pasos.map((p, k) =>
+      `<div style="border-color:${COLORES_PASO[k % COLORES_PASO.length]}">` +
+      (k === 0 ? `Circuito inicial: ${p.arcos.length} ${u}` :
+                 `Subcircuito ${k}: ${p.arcos.length} ${u} · empalme en ${D.vertices[p.en].nombre}`) + `</div>`).join("");
+  } else {
+    txt.innerHTML = "El recorrido final: pasa por todos los arcos y vuelve al punto de partida." +
+      (caso === "barrio" ? " En naranja punteado, las pasadas en las que el camión solo circula." : "");
+    datos.innerHTML = `<div class="dato"><div class="v" id="d-n">0</div><div class="e">${u} recorridas de ${D.ruta.length}</div></div>` +
+      (caso === "barrio"
+        ? `<div class="dato cian"><div class="v" id="d-j">0</div><div class="e">recolectando</div></div>` +
+          `<div class="dato naranja"><div class="v" id="d-x">0</div><div class="e">pasadas extra</div></div>` +
+          `<div class="dato"><div class="v" id="d-t">0</div><div class="e">recorrido total</div></div>` : "");
+  }
+}
+
+// ------------------------------------------------------------------ fases
+function irA(k) {
+  fase = Math.max(0, Math.min(FASES.length - 1, k)); t = 0; pausa = false;
+  document.getElementById("btn-pausa").textContent = "Pausa";
+  document.getElementById("leyenda-calle").innerHTML = "";
+  panel();
+}
+
+function cuadro(dt) {
+  if (!pausa) t += dt * +document.getElementById("vel").value;
+  fondo();
+  const leyenda = document.getElementById("leyenda-calle");
+  if (fase === 0) {
+    const n = Math.min(D.requeridos.length, Math.floor(t * D.velocidad * 3) + 1);
+    D.requeridos.slice(0, n).forEach(i => linea(i, "#7fcadd", grosor, { flecha: true }));
+    vertices("normal"); marcaInicio();
+  } else if (fase === 1) {
+    base("#7fcadd", 0.55); vertices("balance"); marcaInicio();
+  } else if (fase === 2) {
+    base("#7fcadd", 0.35);
+    const n = Math.min(D.extra.length, Math.floor(t * D.velocidad * 2));
+    D.extra.slice(0, n).forEach(i => linea(i, "#e07b39", grosor, { punteada: true, corr: grosor * 2.2, flecha: true, brillo: 10 }));
+    vertices("balance"); marcaInicio();
+  } else if (fase === 3) {
+    base("#3b5a8a", 0.7);
+    D.extra.forEach(i => linea(i, "#3b5a8a", grosor, { punteada: true, corr: grosor * 2.2 }));
+    const hechos = t * D.velocidad;
+    let actual = 0;
+    D.pasos.forEach((p, k) => {
+      const ini = D.inicioPaso[k] + k * 1.5;            // una pausa corta antes de cada subcircuito
+      const col = COLORES_PASO[k % COLORES_PASO.length];
+      const n = hechos - ini;
+      if (n <= -1.5) return;
+      actual = k;
+      if (k > 0 && n < 1.5) anillo(p.en, col, ((n + 1.5) / 3) % 1);
+      p.arcos.forEach((i, j) => {
+        const f = Math.max(0, Math.min(1, n - j));
+        if (f > 0) linea(i, col, grosor + 0.5, { hasta: f, flecha: true, brillo: 6 });
+      });
+      if (k > 0) {
+        const [x, y] = P(p.en);
+        ctx.save(); ctx.fillStyle = col; ctx.font = "700 14px Segoe UI, Arial";
+        ctx.fillText("empalme", x + 12, y + (caso === "ejemplo" ? 44 : 22)); ctx.restore();
+      }
+    });
+    vertices("normal"); marcaInicio();
+    document.querySelectorAll("#lista-pasos div").forEach((el, k) => el.classList.toggle("actual", k === actual));
+    leyenda.innerHTML = `<small>${actual === 0 ? "Circuito inicial desde" : "Empalme en"}</small>${D.vertices[D.pasos[actual].en].nombre}`;
+  } else {
+    base("#2c416c", 1);
+    const pos = Math.min(D.ruta.length, t * D.velocidad * 0.9);
+    const n = Math.floor(pos), f = pos - n;
+    for (let k = 0; k < Math.min(n + 1, D.ruta.length); k++) {
+      const col = D.recolecta[k] ? `hsl(${190 + 110 * k / D.ruta.length}, 95%, 60%)` : "#e07b39";
+      linea(D.ruta[k], col, grosor + 0.5, { hasta: k < n ? 1 : f, punteada: !D.recolecta[k], corr: D.recolecta[k] ? undefined : grosor * 2.2 });
+    }
+    vertices("normal"); marcaInicio();
+    const k = Math.min(n, D.ruta.length - 1), ff = n >= D.ruta.length ? 1 : f;
+    const [x1, y1, x2, y2] = puntos(D.ruta[k], D.recolecta[k] ? undefined : grosor * 2.2);
+    camion(x1 + (x2 - x1) * ff, y1 + (y2 - y1) * ff, Math.atan2(y2 - y1, x2 - x1));
+    const a0 = Math.floor(pos), a1 = Math.ceil(pos), r = pos - a0;
+    const m = D.acum[a0] + r * (D.acum[a1] - D.acum[a0]);
+    const j = D.acumJ[a0] + r * (D.acumJ[a1] - D.acumJ[a0]);
+    const el = id => document.getElementById(id);
+    el("d-n").textContent = Math.floor(pos);
+    if (caso === "barrio") { el("d-j").textContent = fmtKm(j); el("d-x").textContent = fmtKm(m - j); el("d-t").textContent = fmtKm(m); }
+    if (pos >= D.ruta.length) {
+      leyenda.innerHTML = `<small>Terminado</small>Volvió al inicio pasando por todos los arcos`;
+    } else {
+      const a = D.arcos[D.ruta[k]];
+      leyenda.innerHTML = `<small>${D.recolecta[k] ? (caso === "barrio" ? "Recolectando en" : "Recorriendo") : "Solo circula por"}</small>${a.calle}`;
+    }
+  }
+}
+
+function bucle(ahora) {
+  const dt = Math.min(0.1, (ahora - ultimo) / 1000); ultimo = ahora;
+  cuadro(dt);
+  requestAnimationFrame(bucle);
+}
+
+// ------------------------------------------------------------------ controles
+document.querySelectorAll(".tab").forEach(b => b.onclick = () => cargar(b.dataset.caso));
+document.getElementById("btn-sig").onclick = () => irA(fase + 1);
+document.getElementById("btn-ant").onclick = () => irA(fase - 1);
+document.getElementById("btn-pausa").onclick = () => {
+  pausa = !pausa; document.getElementById("btn-pausa").textContent = pausa ? "Seguir" : "Pausa";
+};
+document.addEventListener("keydown", e => {
+  if (["ArrowRight", "PageDown", "ArrowDown", "Enter"].includes(e.key)) { irA(fase + 1); e.preventDefault(); }
+  else if (["ArrowLeft", "PageUp", "ArrowUp", "Backspace"].includes(e.key)) { irA(fase - 1); e.preventDefault(); }
+  else if (e.key === " ") { document.getElementById("btn-pausa").click(); e.preventDefault(); }
+  else if (e.key === "r" || e.key === "R") irA(fase);
+  else if (e.key === "1") cargar("ejemplo");
+  else if (e.key === "2") cargar("barrio");
+});
+window.addEventListener("resize", ajustar);
+
+cargar("ejemplo");
+requestAnimationFrame(bucle);
+</script>
+</body>
+</html>
